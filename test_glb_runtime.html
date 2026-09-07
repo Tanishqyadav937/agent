@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bunny Lip-Sync Test</title>
+    <style>
+        body { margin: 0; font-family: Arial; }
+        canvas { width: 100%; height: 100vh; display: block; }
+        #controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 5px;
+            max-width: 300px;
+        }
+        .slider { width: 100%; margin: 5px 0; }
+        h3 { margin: 10px 0 5px 0; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 3px; }
+        .pass { background: #2d5; }
+        .fail { background: #d52; }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <h2>Bunny Lip-Sync Test</h2>
+        <div id="status">Loading...</div>
+        
+        <h3>Head Rotation</h3>
+        <label>Head Z: <span id="headZ">0</span>°</label>
+        <input type="range" class="slider" id="headRotZ" min="-90" max="90" value="0">
+        
+        <h3>Mouth Controls</h3>
+        <label>jawOpen: <span id="jawOpenVal">0</span></label>
+        <input type="range" class="slider" id="jawOpen" min="0" max="1" step="0.01" value="0">
+        
+        <label>mouthSmile: <span id="mouthSmileVal">0</span></label>
+        <input type="range" class="slider" id="mouthSmile" min="0" max="1" step="0.01" value="0">
+        
+        <label>mouthPucker: <span id="mouthPuckerVal">0</span></label>
+        <input type="range" class="slider" id="mouthPucker" min="0" max="1" step="0.01" value="0">
+        
+        <h3>Eye Controls</h3>
+        <label>blink: <span id="blinkVal">0</span></label>
+        <input type="range" class="slider" id="blink" min="0" max="1" step="0.01" value="0">
+        
+        <div id="testResults"></div>
+    </div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x333333);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(1.5, 0.8, 1.5);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.5, 0);
+        controls.update();
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 5, 5);
+        scene.add(dirLight);
+        
+        // Variables
+        let model, skeleton, headBone;
+        let mouthMesh, eyeLMesh, eyeRMesh;
+        let morphTargets = {};
+        
+        // Load model
+        const loader = new GLTFLoader();
+        loader.load('bunny_character_lipsync.glb', (gltf) => {
+            model = gltf.scene;
+            scene.add(model);
+            
+            // Find components
+            model.traverse((child) => {
+                if (child.isBone && child.name === 'head') {
+                    headBone = child;
+                }
+                if (child.isMesh) {
+                    if (child.name.toLowerCase().includes('mouth')) {
+                        mouthMesh = child;
+                        console.log('Found mouth:', child.name, 'morphs:', child.morphTargetDictionary);
+                    } else if (child.name.toLowerCase().includes('eye')) {
+                        if (child.name.includes('.L')) {
+                            eyeLMesh = child;
+                        } else {
+                            eyeRMesh = child;
+                        }
+                        console.log('Found eye:', child.name, 'morphs:', child.morphTargetDictionary);
+                    }
+                }
+                if (child.isSkinnedMesh && !skeleton) {
+                    skeleton = child.skeleton;
+                }
+            });
+            
+            // Test results
+            const results = [];
+            
+            if (headBone) {
+                results.push({ test: 'Head bone found', pass: true });
+            } else {
+                results.push({ test: 'Head bone found', pass: false });
+            }
+            
+            if (mouthMesh) {
+                results.push({ test: 'Mouth geometry found', pass: true });
+                
+                const mouthControls = ['jawOpen', 'mouthSmile', 'mouthPucker', 'viseme_A'];
+                mouthControls.forEach(ctrl => {
+                    if (mouthMesh.morphTargetDictionary && mouthMesh.morphTargetDictionary[ctrl] !== undefined) {
+                        results.push({ test: `Morph ${ctrl} exists`, pass: true });
+                    } else {
+                        results.push({ test: `Morph ${ctrl} exists`, pass: false });
+                    }
+                });
+            } else {
+                results.push({ test: 'Mouth geometry found', pass: false });
+            }
+            
+            if (eyeLMesh && eyeRMesh) {
+                results.push({ test: 'Eye geometry found', pass: true });
+                
+                const hasBlinkL = eyeLMesh.morphTargetDictionary && eyeLMesh.morphTargetDictionary['blink.L'] !== undefined;
+                const hasBlinkR = eyeRMesh.morphTargetDictionary && eyeRMesh.morphTargetDictionary['blink.R'] !== undefined;
+                results.push({ test: 'Blink morphs exist', pass: hasBlinkL && hasBlinkR });
+            } else {
+                results.push({ test: 'Eye geometry found', pass: false });
+            }
+            
+            // Display results
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<h3>Test Results</h3>';
+            results.forEach(r => {
+                const div = document.createElement('div');
+                div.className = `test-result ${r.pass ? 'pass' : 'fail'}`;
+                div.textContent = `${r.pass ? '✓' : '✗'} ${r.test}`;
+                resultsDiv.appendChild(div);
+            });
+            
+            document.getElementById('status').textContent = 'Loaded! Use controls to test.';
+        }, undefined, (error) => {
+            document.getElementById('status').textContent = 'Error loading model';
+            console.error(error);
+        });
+        
+        // Controls
+        document.getElementById('headRotZ').addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            document.getElementById('headZ').textContent = val.toFixed(0);
+            if (headBone) {
+                headBone.rotation.z = THREE.MathUtils.degToRad(val);
+            }
+        });
+        
+        function setupMorphControl(sliderId, labelId, meshes, morphName) {
+            document.getElementById(sliderId).addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                document.getElementById(labelId).textContent = val.toFixed(2);
+                
+                meshes.forEach(mesh => {
+                    if (mesh && mesh.morphTargetDictionary && mesh.morphTargetDictionary[morphName] !== undefined) {
+                        const index = mesh.morphTargetDictionary[morphName];
+                        mesh.morphTargetInfluences[index] = val;
+                    }
+                });
+            });
+        }
+        
+        setupMorphControl('jawOpen', 'jawOpenVal', [mouthMesh], 'jawOpen');
+        setupMorphControl('mouthSmile', 'mouthSmileVal', [mouthMesh], 'mouthSmile');
+        setupMorphControl('mouthPucker', 'mouthPuckerVal', [mouthMesh], 'mouthPucker');
+        setupMorphControl('blink', 'blinkVal', [eyeLMesh, eyeRMesh], 'blink.L');
+        setupMorphControl('blink', 'blinkVal', [eyeLMesh, eyeRMesh], 'blink.R');
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

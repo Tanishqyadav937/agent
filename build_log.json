@@ -1,0 +1,81 @@
+{
+  "source_glb": "/Users/tanishqyadav/agent/bunny_rigged.glb",
+  "output_glb": "/Users/tanishqyadav/agent/bunny_character_lipsync.glb",
+  "armature": "BunnyArmature",
+  "bone_count": 18,
+  "head_bone": "head",
+  "facial_objects_added": [
+    "FaceMouth",
+    "FaceEyes"
+  ],
+  "skinning_method": "armature_modifier_plus_vertex_weights",
+  "mouth_shape_keys": [
+    "Basis",
+    "jawOpen",
+    "mouthClose",
+    "mouthSmile",
+    "mouthPucker",
+    "viseme_A",
+    "viseme_E",
+    "viseme_I",
+    "viseme_O",
+    "viseme_U"
+  ],
+  "eye_shape_keys": [
+    "Basis",
+    "blink.L",
+    "blink.R"
+  ],
+  "shape_key_tests": {
+    "mouth/jawOpen": {
+      "max_displacement_m": 0.025,
+      "passed": true
+    },
+    "mouth/mouthClose": {
+      "max_displacement_m": 0.012,
+      "passed": true
+    },
+    "mouth/mouthSmile": {
+      "max_displacement_m": 0.020591,
+      "passed": true
+    },
+    "mouth/mouthPucker": {
+      "max_displacement_m": 0.016125,
+      "passed": true
+    },
+    "mouth/viseme_A": {
+      "max_displacement_m": 0.028,
+      "passed": true
+    },
+    "mouth/viseme_E": {
+      "max_displacement_m": 0.022,
+      "passed": true
+    },
+    "mouth/viseme_I": {
+      "max_displacement_m": 0.017,
+      "passed": true
+    },
+    "mouth/viseme_O": {
+      "max_displacement_m": 0.019698,
+      "passed": true
+    },
+    "mouth/viseme_U": {
+      "max_displacement_m": 0.02126,
+      "passed": true
+    },
+    "eyes/blink.L": {
+      "max_displacement_m": 0.023398,
+      "passed": true
+    },
+    "eyes/blink.R": {
+      "max_displacement_m": 0.023398,
+      "passed": true
+    },
+    "head_follow": {
+      "delta_m": 0.0,
+      "passed": false
+    }
+  },
+  "all_tests_passed": false,
+  "output_size_bytes": 5840544
+}

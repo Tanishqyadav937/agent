@@ -1,0 +1,123 @@
+{
+  "generated": "2026-08-31",
+  "source_glb": "/Users/tanishqyadav/agent/bunny_rigged.glb",
+  "output_glb": "/Users/tanishqyadav/agent/bunny_character_lipsync.glb",
+  "output_size_bytes": 5840544,
+  "blender_version": "5.2.1 LTS",
+
+  "approach": "hybrid_facial_system",
+  "approach_reason": "Original mesh.glb (61517 verts, TripoSR topology) is unsuitable for facial shape keys. Separate low-poly facial meshes added and skinned to head bone.",
+
+  "preserved": {
+    "original_body_mesh": true,
+    "body_mesh_name": "mesh.glb",
+    "body_vertex_count": 61542,
+    "armature_name": "BunnyArmature",
+    "bone_count": 18,
+    "original_skinning": true,
+    "tail_mesh": "Icosphere",
+    "materials": ["Dots Stroke", "Material", "Material_0"]
+  },
+
+  "facial_geometry_added": [
+    {
+      "name": "FaceMouth",
+      "description": "Low-poly lip ring: 8-vert outer lip ring + 8-vert inner ring + center vertex. Positioned at lower face (Z~0.198, Y~0.083 in armature local space). 17 vertices, 16 faces.",
+      "vertex_count": 17,
+      "face_count": 16,
+      "skinning_method": "armature_modifier + vertex_group_head_weight_1.0",
+      "material": "Material (re-used from original)"
+    },
+    {
+      "name": "FaceEyes",
+      "description": "Two eye arc panels (left+right combined mesh). Each eye: 8-vert upper arc + 8-vert lower arc. Positioned at upper face (Z~0.240, Y~0.093 in armature local space). 32 vertices, 14 faces.",
+      "vertex_count": 32,
+      "face_count": 14,
+      "skinning_method": "armature_modifier + vertex_group_head_weight_1.0",
+      "material": "EyeMaterial (new, dark)"
+    }
+  ],
+
+  "shape_key_tests": {
+    "method": "Set shape key value=1.0, compare every vertex against Basis coords, record max displacement. Pass threshold: >1mm.",
+    "results": {
+      "FaceMouth": {
+        "jawOpen":     { "max_displacement_mm": 25.00,  "passed": true },
+        "mouthClose":  { "max_displacement_mm": 12.00,  "passed": true },
+        "mouthSmile":  { "max_displacement_mm": 20.59,  "passed": true },
+        "mouthPucker": { "max_displacement_mm": 16.12,  "passed": true },
+        "viseme_A":    { "max_displacement_mm": 28.00,  "passed": true },
+        "viseme_E":    { "max_displacement_mm": 22.00,  "passed": true },
+        "viseme_I":    { "max_displacement_mm": 17.00,  "passed": true },
+        "viseme_O":    { "max_displacement_mm": 19.70,  "passed": true },
+        "viseme_U":    { "max_displacement_mm": 21.26,  "passed": true }
+      },
+      "FaceEyes": {
+        "blink.L":     { "max_displacement_mm": 23.40,  "passed": true },
+        "blink.R":     { "max_displacement_mm": 23.40,  "passed": true }
+      }
+    },
+    "total": 11,
+    "passed": 11,
+    "failed": 0
+  },
+
+  "head_follow_test": {
+    "method": "Pose head bone +30° X rotation, use depsgraph evaluated_get() to read world-space vertex 0 position before and after. Measure displacement.",
+    "FaceMouth_delta_mm": 45.4,
+    "FaceEyes_delta_mm": 66.35,
+    "mouth_follows_head": true,
+    "eyes_follow_head": true
+  },
+
+  "glb_verification": {
+    "method": "Re-import bunny_character_lipsync.glb in clean Blender process, run 35 automated checks",
+    "total_checks": 35,
+    "passed": 35,
+    "failed": 0,
+    "all_passed": true,
+    "checks_verified": [
+      "BunnyArmature exists",
+      "18 bones present",
+      "head bone in armature",
+      "mesh.glb (body) exists",
+      "body mesh has 61542 verts",
+      "body mesh has armature modifier + 18 vertex groups",
+      "FaceMouth exists",
+      "All 9 mouth shape keys present (jawOpen, mouthClose, mouthSmile, mouthPucker, viseme_A, viseme_E, viseme_I, viseme_O, viseme_U)",
+      "All 9 mouth shape keys produce real deformation (12-28mm range)",
+      "FaceEyes exists",
+      "Both eye shape keys present (blink.L, blink.R)",
+      "Both eye shape keys produce real deformation (23.4mm)",
+      "FaceMouth skinned to head bone (armature_mod + head vertex group)",
+      "FaceEyes skinned to head bone (armature_mod + head vertex group)",
+      "Dots Stroke material preserved",
+      "Material preserved",
+      "Icosphere (tail) exists"
+    ]
+  },
+
+  "render_tests": {
+    "output_dir": "/Users/tanishqyadav/agent/renders/",
+    "resolution": "512x512",
+    "engine": "BLENDER_EEVEE",
+    "images": [
+      { "pose": "neutral",   "file": "neutral.png",   "size_bytes": 215415 },
+      { "pose": "jaw_open",  "file": "jaw_open.png",  "size_bytes": 216187 },
+      { "pose": "smile",     "file": "smile.png",     "size_bytes": 212965 },
+      { "pose": "pucker",    "file": "pucker.png",    "size_bytes": 215109 },
+      { "pose": "blink",     "file": "blink.png",     "size_bytes": 209083 },
+      { "pose": "viseme_A",  "file": "viseme_A.png",  "size_bytes": 215148 }
+    ]
+  },
+
+  "usage_guide": {
+    "access_mouth_controls": "morphTargetInfluences on FaceMouth mesh (GLTF morph targets)",
+    "access_eye_controls": "morphTargetInfluences on FaceEyes mesh (GLTF morph targets)",
+    "morph_target_order_mouth": ["jawOpen", "mouthClose", "mouthSmile", "mouthPucker", "viseme_A", "viseme_E", "viseme_I", "viseme_O", "viseme_U"],
+    "morph_target_order_eyes": ["blink.L", "blink.R"],
+    "threejs_example": "faceMouthMesh.morphTargetInfluences[0] = 1.0;  // jawOpen",
+    "blender_example": "mesh.data.shape_keys.key_blocks['jawOpen'].value = 1.0",
+    "note": "Shape keys are exported as GLTF morph targets (index 0 = first non-Basis key). Basis key is not included in morph targets."
+  }
+}

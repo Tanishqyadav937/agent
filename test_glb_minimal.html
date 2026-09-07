@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal GLB Test</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; width: 100%; height: 100%; }
+        #info { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 10px; font-family: monospace; font-size: 12px; max-width: 400px; }
+    </style>
+</head>
+<body>
+    <div id="info">Loading GLB...</div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const logs = [];
+        function log(msg) {
+            console.log(msg);
+            logs.push(msg);
+            document.getElementById('info').innerHTML = logs.join('<br>');
+        }
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xfef5f0);
+        log('✓ Scene created, background: #fef5f0');
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0.8, 2.5);
+        camera.lookAt(0, 0.6, 0);
+        log('✓ Camera at (0, 0.8, 2.5)');
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+        log('✓ Renderer created');
+
+        // Lighting - AGGRESSIVE
+        const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1.5);
+        scene.add(hemi);
+        log('✓ HemisphereLight: intensity 1.5');
+
+        const ambient = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambient);
+        log('✓ AmbientLight: intensity 1.0');
+
+        const directional = new THREE.DirectionalLight(0xffffff, 2.0);
+        directional.position.set(5, 10, 7);
+        scene.add(directional);
+        log('✓ DirectionalLight: intensity 2.0 at (5,10,7)');
+
+        const fill = new THREE.DirectionalLight(0xaabbff, 0.5);
+        fill.position.set(-5, 5, -5);
+        scene.add(fill);
+        log('✓ Fill light');
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0.6, 0);
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 2;
+        controls.update();
+        log('✓ OrbitControls enabled');
+
+        // Load GLB
+        const loader = new GLTFLoader();
+        log('Loading bunny_character_lipsync.glb...');
+
+        loader.load('bunny_character_lipsync.glb', (gltf) => {
+            const model = gltf.scene;
+            log('✓ GLB loaded');
+            log(`  Nodes: ${gltf.scene.children.length}`);
+
+            // Inspect and fix materials
+            let meshCount = 0;
+            let boneCount = 0;
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    meshCount++;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    
+                    if (child.material) {
+                        const mat = Array.isArray(child.material) ? child.material[0] : child.material;
+                        log(`  Mesh "${child.name}": ${mat.constructor.name}`);
+                        log(`    Color: ${mat.color?.getHexString() || 'none'}`);
+                        log(`    Metalness: ${mat.metalness}, Roughness: ${mat.roughness}`);
+                        
+                        // Force visibility
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach(m => {
+                                m.metalness = 0.1;
+                                m.roughness = 0.9;
+                                if (m.color && m.color.getHex() === 0x000000) m.color.setHex(0xcccccc);
+                            });
+                        } else {
+                            mat.metalness = 0.1;
+                            mat.roughness = 0.9;
+                            if (mat.color && mat.color.getHex() === 0x000000) mat.color.setHex(0xcccccc);
+                        }
+                    }
+                } else if (child.isBone) {
+                    boneCount++;
+                }
+            });
+            
+            log(`  Meshes: ${meshCount}, Bones: ${boneCount}`);
+            scene.add(model);
+            log('✓ Model added to scene');
+            log('✓ Scene ready - avatar should be visible');
+
+        }, undefined, (err) => {
+            log(`✗ Load error: ${err.message}`);
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        log('✓ Animation loop started');
+    </script>
+</body>
+</html>

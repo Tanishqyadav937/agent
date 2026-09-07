@@ -1,0 +1,6 @@
+{
+  "mouth_follows_head": true,
+  "eyes_follow_head": true,
+  "mouth_delta_mm": 45.4,
+  "eyes_delta_mm": 66.35
+}

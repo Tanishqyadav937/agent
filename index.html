@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bunny Buddy</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #1e1e24;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden;
+    }
+
+    .dashboard-card {
+      width: 900px;
+      height: 580px;
+      background-color: #f6f0e4;
+      border-radius: 28px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 4px solid #dcd3c1;
+    }
+
+    .navbar {
+      height: 56px;
+      background-color: #eae0cf;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 2px solid #ded3be;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 20px;
+      color: #704714;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #7a6a53;
+    }
+
+    .playground {
+      flex: 1;
+      display: flex;
+      padding: 28px;
+      gap: 28px;
+      background-image: radial-gradient(#60b3cb 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+      background-color: #f6f0e4;
+      align-items: center;
+    }
+
+    .avatar-frame {
+      width: 320px;
+      height: 440px;
+      background: linear-gradient(180deg, #f0e6d2 0%, #e2d3b5 100%);
+      border: 4px solid #00e5ff;
+      border-radius: 28px;
+      box-shadow: 0 12px 30px rgba(0, 229, 255, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+
+    #webgl-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .interaction-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+      padding-left: 12px;
+    }
+
+    .speech-bubble {
+      background-color: #ffd4e5;
+      color: #5c1b37;
+      border-radius: 24px;
+      padding: 24px;
+      font-size: 17px;
+      font-weight: 700;
+      line-height: 1.4;
+      box-shadow: 0 8px 24px rgba(255, 182, 213, 0.4);
+      position: relative;
+      max-width: 440px;
+      border: 2px solid #ffb6d5;
+    }
+
+    .speech-bubble::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      top: 36px;
+      width: 0;
+      height: 0;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+      border-right: 14px solid #ffd4e5;
+    }
+
+    .buttons-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      max-width: 440px;
+    }
+
+    .action-btn {
+      border: none;
+      border-radius: 20px;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .action-btn:active { transform: scale(0.95); }
+    .btn-wave { background-color: #ffd600; color: #4a3b00; }
+    .btn-joke { background-color: #00e5ff; color: #004d40; }
+    .btn-dance { background-color: #ff4081; color: #ffffff; }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <div class="dashboard-card">
+    <div class="navbar">
+      <div class="brand"><span>🐰</span> Bunny Buddy</div>
+      <div class="nav-links">
+        <div>🎮 Play</div>
+        <div>👔 Closet</div>
+        <div>🌻 Garden</div>
+        <div>⚙️ Settings</div>
+      </div>
+    </div>
+
+    <div class="playground">
+      <div class="avatar-frame">
+        <div id="webgl-canvas"></div>
+      </div>
+
+      <div class="interaction-panel">
+        <div class="speech-bubble" id="speech-text">
+          Hi there! I'm your new Bunny Buddy! Tap a button to see what I can do!
+        </div>
+
+        <div class="buttons-grid">
+          <button class="action-btn btn-wave" id="btn-wave">Wave 👏</button>
+          <button class="action-btn btn-joke" id="btn-joke">Tell Joke 😂</button>
+          <button class="action-btn btn-dance" id="btn-dance">Dance 💃</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const container = document.getElementById('webgl-canvas');
+    const speechText = document.getElementById('speech-text');
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(35, container.clientWidth / container.clientHeight, 0.1, 100);
+    camera.position.set(0, 0.8, 2.6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
+    container.appendChild(renderer.domElement);
+
+    // Studio Lighting setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 1.5);
+    dirLight1.position.set(2, 4, 3);
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0xffeedd, 0.8);
+    dirLight2.position.set(-2, 2, -2);
+    scene.add(dirLight2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enableZoom = false;
+
+    let bunnyMesh = null;
+    let armRBone = null;
+    let earLBone = null;
+    let earRBone = null;
+    let currentAnim = 'idle';
+    let animTimer = 0;
+
+    const loader = new GLTFLoader();
+    loader.load('./bunny_output/bunny_rigged.glb', (gltf) => {
+      const model = gltf.scene;
+
+      // 1. Create a parent wrapper group to override skeleton axis orientation
+      const avatarGroup = new THREE.Group();
+      scene.add(avatarGroup);
+      avatarGroup.add(model);
+
+      // 2. Apply explicit rotation to stand upright (-90 deg on X-axis)
+      model.rotation.x = -Math.PI / 2;
+
+      // 3. Rebuild material to force TripoSR vertex colors to render
+      model.traverse((child) => {
+        if (child.isMesh) {
+          bunnyMesh = child;
+          const hasVertexColors = !!child.geometry.attributes.color;
+          child.material = new THREE.MeshStandardMaterial({
+            vertexColors: hasVertexColors,
+            map: child.material.map || null,
+            roughness: 0.5,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+          });
+        }
+        if (child.isBone) {
+          if (child.name === 'Arm.R') armRBone = child;
+          if (child.name === 'Ear.L') earLBone = child;
+          if (child.name === 'Ear.R') earRBone = child;
+        }
+      });
+
+      // 4. Center avatar vertically inside the frame
+      const box = new THREE.Box3().setFromObject(avatarGroup);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+
+      avatarGroup.position.x = -center.x;
+      avatarGroup.position.y = -box.min.y - 0.1;
+      avatarGroup.position.z = -center.z;
+
+      controls.target.set(0, size.y / 2, 0);
+    });
+
+    const jokes = [
+      "Why don't scientists trust atoms? Because they make up everything!",
+      "What do you call a fake noodle? An Impasta!",
+      "Why did the bunny join the gym? To get some hare-cise!"
+    ];
+
+    document.getElementById('btn-wave').addEventListener('click', () => {
+      speechText.innerText = "Hello there! *Waving enthusiastically* 👋";
+      triggerAnimation('wave', 2.5);
+    });
+
+    document.getElementById('btn-joke').addEventListener('click', () => {
+      const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+      speechText.innerText = randomJoke;
+      triggerAnimation('speak', 3.0);
+    });
+
+    document.getElementById('btn-dance').addEventListener('click', () => {
+      speechText.innerText = "Look at my moves! 🕺🎶";
+      triggerAnimation('dance', 4.0);
+    });
+
+    function triggerAnimation(name, durationSec) {
+      currentAnim = name;
+      animTimer = durationSec;
+    }
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const time = clock.getElapsedTime();
+
+      if (animTimer > 0) {
+        animTimer -= delta;
+        if (animTimer <= 0) currentAnim = 'idle';
+      }
+
+      if (earLBone && earRBone) {
+        if (currentAnim === 'dance') {
+          earLBone.rotation.z = Math.sin(time * 12) * 0.35;
+          earRBone.rotation.z = -Math.sin(time * 12) * 0.35;
+        } else {
+          earLBone.rotation.z = Math.sin(time * 3) * 0.08;
+          earRBone.rotation.z = -Math.sin(time * 3) * 0.08;
+        }
+      }
+
+      if (armRBone) {
+        if (currentAnim === 'wave') {
+          armRBone.rotation.z = 1.2 + Math.sin(time * 15) * 0.4;
+        } else {
+          armRBone.rotation.z = THREE.MathUtils.lerp(armRBone.rotation.z, 0, 0.1);
+        }
+      }
+
+      if (bunnyMesh && bunnyMesh.morphTargetDictionary && bunnyMesh.morphTargetInfluences) {
+        const visemeIdx = bunnyMesh.morphTargetDictionary['viseme_AA'];
+        if (visemeIdx !== undefined) {
+          if (currentAnim === 'speak') {
+            bunnyMesh.morphTargetInfluences[visemeIdx] = Math.abs(Math.sin(time * 14));
+          } else {
+            bunnyMesh.morphTargetInfluences[visemeIdx] = THREE.MathUtils.lerp(bunnyMesh.morphTargetInfluences[visemeIdx], 0, 0.1);
+          }
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+</body>
+</html>

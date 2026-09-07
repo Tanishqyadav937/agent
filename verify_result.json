@@ -1,0 +1,164 @@
+{
+  "glb_path": "/Users/tanishqyadav/agent/bunny_character_lipsync.glb",
+  "total_checks": 35,
+  "passed": 35,
+  "failed": 0,
+  "all_passed": true,
+  "failures": [],
+  "checks": {
+    "armature_exists": {
+      "passed": true,
+      "detail": "BunnyArmature=found"
+    },
+    "bone_count_18": {
+      "passed": true,
+      "detail": "18 bones"
+    },
+    "head_bone_present": {
+      "passed": true,
+      "detail": "'head' in bones=['root', 'spine', 'chest', 'neck', 'head', 'ear.L', 'ear.R', 'upper_arm.L', 'forearm.L', 'upper_arm.R', 'forearm.R', 'tail', 'thigh.L', 'shin.L', 'foot.L', 'thigh.R', 'shin.R', 'foot.R']"
+    },
+    "body_mesh_exists": {
+      "passed": true,
+      "detail": "mesh.glb=found"
+    },
+    "body_mesh_verts": {
+      "passed": true,
+      "detail": "61542 verts (expected ~61517)"
+    },
+    "body_mesh_skinned": {
+      "passed": true,
+      "detail": "armature_modifier=True, vertex_groups=18"
+    },
+    "face_mouth_exists": {
+      "passed": true,
+      "detail": "FaceMouth=found"
+    },
+    "mouth_sk_jawOpen": {
+      "passed": true,
+      "detail": "key='jawOpen' present=True"
+    },
+    "mouth_sk_mouthClose": {
+      "passed": true,
+      "detail": "key='mouthClose' present=True"
+    },
+    "mouth_sk_mouthSmile": {
+      "passed": true,
+      "detail": "key='mouthSmile' present=True"
+    },
+    "mouth_sk_mouthPucker": {
+      "passed": true,
+      "detail": "key='mouthPucker' present=True"
+    },
+    "mouth_sk_viseme_A": {
+      "passed": true,
+      "detail": "key='viseme_A' present=True"
+    },
+    "mouth_sk_viseme_E": {
+      "passed": true,
+      "detail": "key='viseme_E' present=True"
+    },
+    "mouth_sk_viseme_I": {
+      "passed": true,
+      "detail": "key='viseme_I' present=True"
+    },
+    "mouth_sk_viseme_O": {
+      "passed": true,
+      "detail": "key='viseme_O' present=True"
+    },
+    "mouth_sk_viseme_U": {
+      "passed": true,
+      "detail": "key='viseme_U' present=True"
+    },
+    "mouth_sk_jawOpen_deforms": {
+      "passed": true,
+      "detail": "max_disp=25.00mm OK"
+    },
+    "mouth_sk_mouthClose_deforms": {
+      "passed": true,
+      "detail": "max_disp=12.00mm OK"
+    },
+    "mouth_sk_mouthSmile_deforms": {
+      "passed": true,
+      "detail": "max_disp=20.59mm OK"
+    },
+    "mouth_sk_mouthPucker_deforms": {
+      "passed": true,
+      "detail": "max_disp=16.12mm OK"
+    },
+    "mouth_sk_viseme_A_deforms": {
+      "passed": true,
+      "detail": "max_disp=28.00mm OK"
+    },
+    "mouth_sk_viseme_E_deforms": {
+      "passed": true,
+      "detail": "max_disp=22.00mm OK"
+    },
+    "mouth_sk_viseme_I_deforms": {
+      "passed": true,
+      "detail": "max_disp=17.00mm OK"
+    },
+    "mouth_sk_viseme_O_deforms": {
+      "passed": true,
+      "detail": "max_disp=19.70mm OK"
+    },
+    "mouth_sk_viseme_U_deforms": {
+      "passed": true,
+      "detail": "max_disp=21.26mm OK"
+    },
+    "face_eyes_exists": {
+      "passed": true,
+      "detail": "FaceEyes=found"
+    },
+    "eye_sk_blink.L": {
+      "passed": true,
+      "detail": "key='blink.L' present=True"
+    },
+    "eye_sk_blink.R": {
+      "passed": true,
+      "detail": "key='blink.R' present=True"
+    },
+    "eye_sk_blink.L_deforms": {
+      "passed": true,
+      "detail": "max_disp=23.40mm OK"
+    },
+    "eye_sk_blink.R_deforms": {
+      "passed": true,
+      "detail": "max_disp=23.40mm OK"
+    },
+    "mouth_skinned_to_head": {
+      "passed": true,
+      "detail": "armature_mod=True, head_vgroup=True"
+    },
+    "eyes_skinned_to_head": {
+      "passed": true,
+      "detail": "armature_mod=True, head_vgroup=True"
+    },
+    "material_dots_stroke": {
+      "passed": true,
+      "detail": "Materials: ['Dots Stroke', 'EyeMaterial', 'Material', 'Material.001', 'Material_0']"
+    },
+    "material_material_exists": {
+      "passed": true,
+      "detail": "Materials: ['Dots Stroke', 'EyeMaterial', 'Material', 'Material.001', 'Material_0']"
+    },
+    "tail_mesh_exists": {
+      "passed": true,
+      "detail": "Icosphere=found"
+    }
+  },
+  "objects_in_scene": [
+    "BunnyArmature",
+    "FaceEyes",
+    "FaceMouth",
+    "Icosphere",
+    "mesh.glb"
+  ],
+  "materials_in_scene": [
+    "Dots Stroke",
+    "EyeMaterial",
+    "Material",
+    "Material.001",
+    "Material_0"
+  ]
+}
