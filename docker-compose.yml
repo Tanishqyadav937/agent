@@ -1,0 +1,69 @@
+# Local Development Stack with Docker Compose
+# Run: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Local Chroma Vector Database with persistent SQLite
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: chroma-local
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent SQLite database
+      - chroma-data:/chroma/chroma-data
+    environment:
+      # Chroma server configuration
+      CHROMA_HOST: "0.0.0.0"
+      CHROMA_PORT: "8000"
+      # Optional: Enable CORS for development
+      # CHROMA_SERVER_CORS_ALLOW_ORIGINS: "*"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - voice-network
+
+volumes:
+  # Persistent volume for Chroma SQLite database
+  chroma-data:
+    driver: local
+
+networks:
+  voice-network:
+    driver: bridge
+
+# Usage:
+# ------
+# Start all services:
+#   docker-compose up -d
+#
+# View logs:
+#   docker-compose logs -f chroma
+#
+# Verify Chroma is running:
+#   curl http://localhost:8000/api/v1/heartbeat
+#
+# Stop services:
+#   docker-compose down
+#
+# Stop and remove volumes (WARNING: deletes data):
+#   docker-compose down -v
+#
+# Development workflow:
+#
+#   Terminal 1: Start Chroma server
+#     docker-compose up -d chroma
+#
+#   Terminal 2: Start your backend
+#     npm start
+#
+#   Terminal 3: Test
+#     curl -X POST http://localhost:3000/converse-text \
+#       -H "Content-Type: application/json" \
+#       -d '{"sessionId": "test", "user_input": "Hello"}'
