@@ -1,14 +1,68 @@
 services:
   - type: web
-    name: my-ai-service
-    env: docker
-    plan: free
+    name: voice-assistant-api
+    runtime: docker
+    region: oregon
+    
+    # Docker configuration - MUST point to root Dockerfile
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    
+    # Health check
+    healthCheckPath: /health
+    healthCheckInterval: 30
+    
+    # Port configuration
+    port: 3000
+    
+    # Deployment settings
+    autoDeploy: true
+    
+    # Build and start commands (Docker runs CMD from Dockerfile)
+    buildCommand: npm ci --only=production
+    startCommand: node server.js
+    
+    # Environment variables
     envVars:
+      # Core configuration
+      - key: NODE_ENV
+        value: production
+      
+      - key: LLM_PROVIDER
+        value: gemini
+      
+      - key: PORT
+        value: 3000
+      
+      # Deepgram (Speech-to-Text) - MUST SET
       - key: DEEPGRAM_API_KEY
         sync: false
+      
+      # Google Gemini (LLM) - MUST SET
       - key: GEMINI_API_KEY
         sync: false
+      
+      # Chroma Cloud (Memory/Vector DB) - MUST SET
       - key: CHROMA_URL
-        sync: false
+        value: https://api.trychroma.com
+      
       - key: CHROMA_API_KEY
         sync: false
+      
+      # Embedding model for Chroma
+      - key: EMBEDDING_MODEL
+        value: mxbai-embed-large
+      
+      # Tool API keys (optional)
+      - key: OPENWEATHER_API_KEY
+        sync: false
+      
+      - key: SERPER_API_KEY
+        sync: false
+      
+      # TTS configuration
+      - key: TOOLS_ENABLED
+        value: "true"
+    
+    # Instance type
+    plan: standard
