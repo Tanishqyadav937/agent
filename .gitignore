@@ -1,7 +1,57 @@
 node_modules/
 .env
+.env.local
+.env.*.local
 *.log
 .DS_Store
 test-audio/
 data/
 temp-tts-*.wav
+chroma_data/
+piper-venv/
+piper-voices/
+# Secrets and credentials
+.env.production
+.env.production.local
+secrets/
+*.key
+*.pem
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+# Build outputs
+dist/
+build/
+# Test coverage
+coverage/
+.nyc_output/
+# Optional npm cache
+.npm
+# macOS
+.DS_Store
+Thumbs.db
+# Temporary files
+*.tmp
+*.bak
+temp-*
+# Audio files
+*.wav
+*.mp3
+*.flac
+# Model files (keep only code references)
+*.onnx
+*.onnx.json
+# Blender files (keep only code)
+*.blend
+*.blend*
+# Large files
+*.psd
+*.zip
+# IDE
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+
