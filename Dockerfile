@@ -77,3 +77,4 @@ ENV LLM_PROVIDER=gemini
 
 # Start application
 CMD ["node", "server.js"]
+# Force rebuild - chromadb legacy peer deps fix
