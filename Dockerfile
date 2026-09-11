@@ -46,14 +46,14 @@ COPY package*.json ./
 
 # Install Node dependencies (production only, no dev)
 # --legacy-peer-deps required for chromadb peer dependency conflicts
-RUN npm install --production --legacy-peer-deps
+RUN npm ci --omit=dev --legacy-peer-deps
 
 # Copy Piper from builder stage
 COPY --from=piper-builder /piper-voices /app/piper-voices
 COPY --from=piper-builder /piper-dist /app/piper-dist
 
 # Install Piper TTS in runtime environment
-RUN pip install --no-cache-dir piper-tts
+RUN pip install --no-cache-dir --break-system-packages piper-tts
 
 # Create piper-venv structure compatible with server.js
 RUN mkdir -p /app/piper-venv/bin && \
