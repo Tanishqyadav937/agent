@@ -45,7 +45,8 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install Node dependencies (production only, no dev)
-RUN npm ci --omit=dev
+# --legacy-peer-deps required for chromadb peer dependency conflicts
+RUN npm ci --omit=dev --legacy-peer-deps
 
 # Copy Piper from builder stage
 COPY --from=piper-builder /piper-voices /app/piper-voices
