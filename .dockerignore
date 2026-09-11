@@ -22,5 +22,4 @@ TripoSR/
 *.jpg
 *.png
 build_log.json
-*.json
 .git/
