@@ -45,7 +45,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install Node dependencies (production only, no dev)
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Copy Piper from builder stage
 COPY --from=piper-builder /piper-voices /app/piper-voices
