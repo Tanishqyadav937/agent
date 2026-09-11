@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     git \
     libsndfile1-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone and build Piper
@@ -18,13 +19,13 @@ RUN git clone https://github.com/rhasspy/piper.git . && \
     mkdir -p /piper-dist && \
     cp -r src/python /piper-dist/
 
-# Download voice model (en_US-lessac-medium)
-RUN pip install --no-cache-dir piper-tts && \
-    mkdir -p /piper-voices && \
-    python3 -c "import piper; piper.download_voice('en_US-lessac-medium', '/piper-voices')" || \
-    # Fallback: download directly if piper download fails
-    (curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-1/en_US-lessac-medium.onnx -o /piper-voices/en_US-lessac-medium.onnx && \
-     curl -L https://github.com/rhasspy/piper/releases/download/2023.11.14-1/en_US-lessac-medium.onnx.json -o /piper-voices/en_US-lessac-medium.onnx.json)
+# Download voice model (en_US-lessac-medium) directly from Hugging Face
+# This is the stable, canonical source for Piper voice models
+RUN mkdir -p /piper-voices && \
+    curl -L -o /piper-voices/en_US-lessac-medium.onnx \
+    "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx" && \
+    curl -L -o /piper-voices/en_US-lessac-medium.onnx.json \
+    "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json"
 
 # Stage 2: Production runtime
 FROM node:20-slim
@@ -60,7 +61,7 @@ RUN mkdir -p /app/piper-venv/bin && \
 # Copy application code
 COPY server.js tools.js .env.example /app/
 COPY avatar.html index.html test.html /app/
-COPY scripts/ /app/scripts/ 2>/dev/null || true
+COPY scripts/ /app/scripts/
 
 # Expose port (Render will set actual port via PORT env var)
 EXPOSE 3000
