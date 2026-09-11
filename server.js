@@ -34,17 +34,40 @@ const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // LLM Provider Configuration
-const LLM_PROVIDER = process.env.LLM_PROVIDER || 'local'; // 'local' or 'cloud'
+// In production (Render), LLM_PROVIDER should be 'gemini' to skip Ollama entirely
+// Possible values: 'local' (Ollama), 'gemini' (Google Gemini - production), 'cloud' (legacy, maps to gemini)
+const LLM_PROVIDER = process.env.LLM_PROVIDER || 'local'; // 'local', 'gemini', or 'cloud'
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2';
 const TOOLS_ENABLED = process.env.TOOLS_ENABLED === 'true'; // Enable function calling
 
-console.log(`[LLM] Provider: ${LLM_PROVIDER}${LLM_PROVIDER === 'local' ? ` (${OLLAMA_MODEL})` : ' (Gemini)'}`);
+// Normalize provider names
+const normalizedProvider = LLM_PROVIDER === 'cloud' ? 'gemini' : LLM_PROVIDER;
+
+console.log(`[LLM] Provider: ${normalizedProvider}${normalizedProvider === 'local' ? ` (${OLLAMA_MODEL})` : ' (Google Gemini)'}`);
 console.log(`[LLM] Tools enabled: ${TOOLS_ENABLED}`);
-// Initialize Chroma client (local server on port 8000)
-const chromaClient = new ChromaClient({
-  path: 'http://localhost:8000'
-});
+// Initialize Chroma client (local server on port 8000 OR Chroma Cloud)
+const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000';
+const CHROMA_API_KEY = process.env.CHROMA_API_KEY || null;
+
+console.log(`[Chroma] URL: ${CHROMA_URL}${CHROMA_API_KEY ? ' (with API key)' : ''}`);
+
+let chromaClient;
+if (CHROMA_API_KEY) {
+  // Production: Chroma Cloud with API key
+  chromaClient = new ChromaClient({
+    path: CHROMA_URL,
+    auth: {
+      provider: 'token',
+      credentials: CHROMA_API_KEY
+    }
+  });
+} else {
+  // Development: Local Chroma server
+  chromaClient = new ChromaClient({
+    path: CHROMA_URL
+  });
+}
 
 // Embedding Configuration
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'nomic-embed-text';
@@ -71,8 +94,8 @@ async function initializeChroma() {
     
     console.log('[Memory] Chroma initialized successfully');
   } catch (error) {
-    console.error('[Memory] Failed to initialize Chroma:', error.message);
-    throw error;
+    console.warn('[Memory] Chroma server not reachable. Running without persistent memory:', error.message);
+    memoryCollection = null;
   }
 }
 
@@ -481,16 +504,25 @@ async function transcribeAudio(audioBuffer) {
   }
 }
 
-// Get response from LLM with context (Ollama or Gemini based on LLM_PROVIDER)
+// Get response from LLM with context (Gemini in production, Ollama optional in dev)
 async function getLLMResponseWithContext(contextPrompt) {
   try {
-    if (LLM_PROVIDER === 'local') {
+    // Production: Always use Gemini if provider is explicitly set to 'gemini'
+    if (normalizedProvider === 'gemini') {
+      return await getGeminiResponse(contextPrompt);
+    }
+    // Development: Use Ollama
+    else if (normalizedProvider === 'local') {
       return await getOllamaResponse(contextPrompt);
-    } else {
+    }
+    // Fallback: Use Gemini if neither is configured
+    else {
+      console.warn('[LLM] Unknown provider, falling back to Gemini');
       return await getGeminiResponse(contextPrompt);
     }
   } catch (error) {
-    error.step = `LLM (${LLM_PROVIDER === 'local' ? 'Ollama' : 'Gemini'})`;
+    const provider = normalizedProvider === 'local' ? 'Ollama' : 'Gemini';
+    error.step = `LLM (${provider})`;
     throw error;
   }
 }
@@ -732,13 +764,14 @@ app.get('/health', async (req, res) => {
         reachable: false,
         model_available: false,
         model_name: OLLAMA_MODEL,
-        tools_enabled: TOOLS_ENABLED
+        tools_enabled: TOOLS_ENABLED,
+        note: normalizedProvider === 'gemini' ? 'Production mode: Ollama not used' : 'Development mode: Ollama enabled'
       }
     }
   };
 
-  // Check Ollama connectivity and model availability
-  if (LLM_PROVIDER === 'local') {
+  // Check Ollama connectivity only if in development mode
+  if (normalizedProvider === 'local') {
     try {
       // Check if Ollama is reachable
       const tagsResponse = await fetch(`${OLLAMA_BASE_URL}/api/tags`, {
@@ -768,17 +801,21 @@ app.get('/health', async (req, res) => {
         ? 'Ollama not responding (timeout)' 
         : `Cannot reach Ollama: ${error.message}`;
     }
-  } else {
-    health.services.ollama.note = 'LLM_PROVIDER is set to "cloud", using Gemini instead';
   }
 
   // Overall health status
-  const criticalServicesOk = health.services.deepgram && 
-                             health.services.piper && 
-                             health.services.chroma &&
-                             (LLM_PROVIDER === 'cloud' ? health.services.gemini : (health.services.ollama.reachable && health.services.ollama.model_available));
+  let criticalServicesOk = health.services.deepgram && 
+                           health.services.piper && 
+                           health.services.chroma;
   
-  health.status = criticalServicesOk ? 'ok' : 'degraded';
+  // Check LLM based on provider
+  if (normalizedProvider === 'gemini') {
+    criticalServicesOk = criticalServicesOk && health.services.gemini;
+  } else if (normalizedProvider === 'local') {
+    criticalServicesOk = criticalServicesOk && health.services.ollama.reachable && health.services.ollama.model_available;
+  }
+  
+  health.status = criticalServicesOk ? 'healthy' : 'degraded';
 
   res.json(health);
 });

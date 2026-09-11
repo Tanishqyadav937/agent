@@ -1,961 +1,532 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bunny Buddy - Audio-Driven Voice Assistant</title>
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        /* Polka-dot background pattern */
-        body {
-            font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background-color: #fff9ef;
-            background-image: 
-                radial-gradient(circle, rgba(255, 182, 193, 0.15) 2px, transparent 2px),
-                radial-gradient(circle, rgba(255, 218, 185, 0.1) 3px, transparent 3px);
-            background-size: 40px 40px, 60px 60px;
-            background-position: 0 0, 20px 20px;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        
-        /* Top Navigation Bar */
-        .navbar {
-            background: #fff9ef;
-            border-bottom: 2px solid rgba(255, 182, 193, 0.2);
-            padding: 12px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        
-        .navbar-left {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 20px;
-            font-weight: 700;
-            color: #d4876d;
-        }
-        
-        .navbar-center {
-            display: flex;
-            gap: 8px;
-            flex: 1;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .nav-link {
-            padding: 8px 16px;
-            border-radius: 20px;
-            background: transparent;
-            border: none;
-            font-family: 'Quicksand', sans-serif;
-            font-weight: 600;
-            cursor: pointer;
-            color: #8b6f6f;
-            font-size: 13px;
-            transition: all 0.2s;
-        }
-        
-        .nav-link:hover {
-            background: rgba(255, 182, 193, 0.2);
-            color: #d4876d;
-        }
-        
-        .navbar-right {
-            font-size: 22px;
-            cursor: pointer;
-            color: #d4876d;
-        }
-        
-        /* Main container */
-        .main-container {
-            flex: 1;
-            padding: 28px 24px;
-            display: grid;
-            grid-template-columns: 1.2fr 1fr;
-            gap: 28px;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-        
-        /* Avatar Card */
-        .avatar-card {
-            background: white;
-            border-radius: 48px;
-            padding: 24px;
-            box-shadow: 0 8px 24px rgba(212, 135, 109, 0.15);
-            border: 3px solid rgba(255, 182, 193, 0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        
-        #canvas-container {
-            background: linear-gradient(180deg, #fef5f0 0%, #fdeee8 100%);
-            border-radius: 32px;
-            min-height: 500px;
-            overflow: hidden;
-            flex: 1;
-        }
-        
-        canvas { 
-            display: block; 
-            width: 100%; 
-            height: 100%; 
-        }
-        
-        .model-info {
-            font-size: 12px;
-            color: #8b6f6f;
-            padding: 12px;
-            background: #fef5f0;
-            border-radius: 12px;
-            text-align: center;
-        }
-        
-        /* Right column with controls */
-        .controls-column {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        /* Speech Bubble */
-        .speech-bubble {
-            background: #ffd9e8;
-            border-radius: 28px;
-            padding: 20px 24px;
-            position: relative;
-            box-shadow: 0 4px 12px rgba(255, 182, 193, 0.2);
-            min-height: 70px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            font-weight: 600;
-            color: #8b6f6f;
-            text-align: center;
-            line-height: 1.4;
-        }
-        
-        /* Tail pointer for speech bubble */
-        .speech-bubble::after {
-            content: '';
-            position: absolute;
-            bottom: -10px;
-            left: 24px;
-            width: 0;
-            height: 0;
-            border-left: 10px solid transparent;
-            border-right: 0 solid transparent;
-            border-top: 10px solid #ffd9e8;
-        }
-        
-        .control-section {
-            background: white;
-            border-radius: 32px;
-            padding: 20px;
-            box-shadow: 0 8px 24px rgba(212, 135, 109, 0.1);
-            border: 3px solid rgba(255, 182, 193, 0.2);
-        }
-        
-        .control-title {
-            font-size: 13px;
-            font-weight: 700;
-            color: #d4876d;
-            margin-bottom: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Rounded pill buttons */
-        .btn-pill {
-            padding: 12px 28px;
-            border: none;
-            border-radius: 24px;
-            font-family: 'Quicksand', sans-serif;
-            font-weight: 700;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            border-bottom: 3px solid;
-            position: relative;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #ff9999 0%, #ff8080 100%);
-            color: white;
-            border-bottom-color: #ff6666;
-            width: 100%;
-        }
-        
-        .btn-primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(255, 128, 128, 0.3);
-            border-bottom-color: #ff5555;
-        }
-        
-        .btn-primary:active:not(:disabled) {
-            transform: translateY(1px);
-            border-bottom-color: #ff7777;
-        }
-        
-        .btn-primary.recording {
-            animation: pulse-button 0.6s infinite;
-            background: linear-gradient(135deg, #ff6666 0%, #ff4d4d 100%);
-        }
-        
-        @keyframes pulse-button {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.75; }
-        }
-        
-        .btn-secondary {
-            background: rgba(255, 182, 193, 0.3);
-            color: #d4876d;
-            border-bottom-color: rgba(255, 182, 193, 0.5);
-            flex: 1;
-        }
-        
-        .btn-secondary:hover:not(:disabled) {
-            background: rgba(255, 182, 193, 0.5);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(255, 182, 193, 0.2);
-        }
-        
-        .btn-secondary:active:not(:disabled) {
-            transform: translateY(1px);
-        }
-        
-        .btn-pill:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .time-display {
-            text-align: center;
-            font-size: 13px;
-            color: #8b6f6f;
-            font-weight: 600;
-            font-variant-numeric: tabular-nums;
-            margin-top: 8px;
-        }
-        
-        .button-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        
-        .info-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            font-size: 12px;
-        }
-        
-        .info-item {
-            background: #fef5f0;
-            padding: 10px;
-            border-radius: 12px;
-            text-align: center;
-        }
-        
-        .info-item-label {
-            font-size: 11px;
-            font-weight: 700;
-            color: #d4876d;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-            margin-bottom: 4px;
-        }
-        
-        .info-item-value {
-            font-size: 13px;
-            font-weight: 600;
-            color: #8b6f6f;
-        }
-        
-        .info-item-value.success { color: #6ba55f; }
-        .info-item-value.error { color: #c62828; }
-        .info-item-value.neutral { color: #8b6f6f; }
-        
-        .debug-panel {
-            background: #fef5f0;
-            border-radius: 12px;
-            padding: 12px;
-            max-height: 120px;
-            overflow-y: auto;
-            font-size: 10px;
-            font-family: 'Courier New', monospace;
-            color: #8b6f6f;
-            display: none;
-        }
-        
-        .debug-panel.active {
-            display: block;
-        }
-        
-        /* Mobile responsive */
-        @media (max-width: 1024px) {
-            .main-container {
-                grid-template-columns: 1fr;
-                gap: 20px;
-                padding: 20px 16px;
-            }
-            
-            .navbar {
-                padding: 10px 16px;
-            }
-            
-            .navbar-center {
-                gap: 4px;
-            }
-            
-            .nav-link {
-                padding: 6px 12px;
-                font-size: 12px;
-            }
-            
-            #canvas-container {
-                min-height: 400px;
-            }
-            
-            .speech-bubble {
-                min-height: 60px;
-                font-size: 14px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Navigation Bar -->
-    <div class="navbar">
-        <div class="navbar-left">
-            <span>🐰</span>
-            <span>Bunny Buddy</span>
-        </div>
-        <div class="navbar-center">
-            <button class="nav-link">Play</button>
-            <button class="nav-link">Closet</button>
-            <button class="nav-link">Garden</button>
-            <button class="nav-link">Settings</button>
-        </div>
-        <div class="navbar-right">👤</div>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-container">
-        <!-- Left: Avatar Card -->
-        <div class="avatar-card">
-            <div id="canvas-container"></div>
-            <div class="model-info" id="modelStatus">Loading...</div>
-        </div>
-
-        <!-- Right: Controls Column -->
-        <div class="controls-column">
-            <!-- Speech Bubble -->
-            <div class="speech-bubble" id="speechBubble">Ready to chat!</div>
-
-            <!-- Recording Control -->
-            <div class="control-section">
-                <div class="control-title">Voice Input</div>
-                <button class="btn-pill btn-primary" id="micBtn">🎤 Start Recording</button>
-                <div class="time-display" id="recordTime">0:00</div>
-            </div>
-
-            <!-- Quick Status -->
-            <div class="control-section">
-                <div class="control-title">Status</div>
-                <div class="info-grid">
-                    <div class="info-item">
-                        <div class="info-item-label">Microphone</div>
-                        <div class="info-item-value neutral" id="micStatus">Waiting...</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-label">Audio</div>
-                        <div class="info-item-value neutral" id="voiceActivity">Silent</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-label">Mouth</div>
-                        <div class="info-item-value neutral" id="jawValue">0.00</div>
-                    </div>
-                    <div class="info-item">
-                        <div class="info-item-label">Viseme</div>
-                        <div class="info-item-value neutral" id="visemeValue">—</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Debug Toggle -->
-            <div class="button-row">
-                <button class="btn-pill btn-secondary" id="debugBtn">🔧 Debug</button>
-                <button class="btn-pill btn-secondary" id="idleBtn">😴 Idle</button>
-            </div>
-
-            <!-- Debug Panel -->
-            <div class="debug-panel" id="debugPanel">
-                <div id="debugOutput">Ready</div>
-            </div>
-        </div>
-    </div>
-
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bunny Buddy - Voice Assistant</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: radial-gradient(circle at 50% 30%, #e0f2fe 0%, #f8fafc 55%, #ffffff 100%);
+      min-height: 100vh;
     }
-    </script>
     
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    .sound-bar {
+      transition: height 0.08s ease-out, transform 0.08s ease-out;
+      will-change: height, transform;
+    }
+
+    /* Subtle pulse animation for thinking state */
+    @keyframes barPulse {
+      0%, 100% { transform: scaleY(0.4); }
+      50% { transform: scaleY(1.3); }
+    }
+
+    .thinking-pulse .sound-bar:nth-child(1) { animation: barPulse 1.2s infinite ease-in-out 0.0s; }
+    .thinking-pulse .sound-bar:nth-child(2) { animation: barPulse 1.2s infinite ease-in-out 0.2s; }
+    .thinking-pulse .sound-bar:nth-child(3) { animation: barPulse 1.2s infinite ease-in-out 0.4s; }
+    .thinking-pulse .sound-bar:nth-child(4) { animation: barPulse 1.2s infinite ease-in-out 0.6s; }
+    .thinking-pulse .sound-bar:nth-child(5) { animation: barPulse 1.2s infinite ease-in-out 0.8s; }
+
+    /* Custom Glassmorphism */
+    .glass-pill {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+  </style>
+</head>
+<body class="relative flex flex-col justify-between min-h-screen text-slate-800 antialiased selection:bg-sky-200 overflow-x-hidden">
+
+  <!-- Transparent Landscape Background Image -->
+  <div class="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat opacity-30" style="background-image: url('background_landscape.jpg');"></div>
+
+  <!-- Top Minimal Header Navbar -->
+  <header class="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between z-20">
+    <a href="#" class="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">← Homepage</a>
+    <a href="#" class="text-sm font-semibold text-slate-600 hover:text-slate-900 transition-colors">For agents?</a>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 flex flex-col items-center justify-center px-4 -mt-6 relative z-10 text-center">
+    
+    <!-- LANDING / IDLE VIEW -->
+    <div id="idleView" class="flex flex-col items-center max-w-2xl mx-auto transition-all duration-300 opacity-100 scale-100">
+      
+      <!-- Hero Title & Subtitle -->
+      <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-slate-900 mb-3">
+        Hi. I'm Bunny Buddy.
+      </h1>
+      <p class="text-lg sm:text-xl text-slate-600 font-normal mb-1">
+        Pick up where we left off, or start somewhere new.
+      </p>
+      <span class="text-xs font-bold uppercase tracking-widest text-slate-400 mb-10">
+        Hold Space to talk
+      </span>
+
+      <!-- Quick Prompt Pills -->
+      <div class="flex flex-wrap items-center justify-center gap-3 max-w-xl mx-auto mb-12">
+        <button data-prompt="How's your week going?" class="prompt-btn px-5 py-2.5 rounded-full glass-pill border border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300 text-sm font-medium text-slate-700 hover:text-slate-900 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+          How's your week going?
+        </button>
+        <button data-prompt="Working on anything fun?" class="prompt-btn px-5 py-2.5 rounded-full glass-pill border border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300 text-sm font-medium text-slate-700 hover:text-slate-900 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+          Working on anything fun?
+        </button>
+        <button data-prompt="I'm hiring. What should I ask?" class="prompt-btn px-5 py-2.5 rounded-full glass-pill border border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300 text-sm font-medium text-slate-700 hover:text-slate-900 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+          I'm hiring. What should I ask?
+        </button>
+        <button id="askAnythingPill" class="prompt-btn px-5 py-2.5 rounded-full glass-pill border border-slate-200/90 shadow-sm hover:shadow-md hover:border-slate-300 text-sm font-medium text-slate-700 hover:text-slate-900 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0">
+          Ask me anything
+        </button>
+      </div>
+
+      <!-- Central Floating Microphone Action Button -->
+      <button id="micBtn" title="Click to start/stop talking" class="relative group p-5 rounded-full bg-slate-900 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-sky-300">
+        <span class="absolute -inset-1 rounded-full bg-sky-400 opacity-0 group-hover:opacity-25 blur transition-opacity"></span>
+        <svg class="w-7 h-7 relative z-10 fill-current" viewBox="0 0 24 24">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+
+    </div>
+
+    <!-- ACTIVE VOICE LISTENING / SPEAKING VIEW -->
+    <div id="activeView" class="hidden flex-col items-center max-w-md mx-auto transition-all duration-300 opacity-0 scale-95">
+      
+      <!-- Central Black Circular Capsule Visualizer -->
+      <button id="visualizerCapsule" title="Click to end session" class="relative group px-10 py-7 bg-slate-950 hover:bg-slate-900 text-white rounded-full shadow-2xl transition-all duration-300 transform hover:scale-105 active:scale-95 focus:outline-none ring-4 ring-slate-900/10">
+        <div id="soundBarsContainer" class="flex items-center justify-center space-x-1.5 h-10 w-24">
+          <div class="sound-bar w-1.5 bg-white rounded-full h-4"></div>
+          <div class="sound-bar w-1.5 bg-white rounded-full h-8"></div>
+          <div class="sound-bar w-1.5 bg-white rounded-full h-6"></div>
+          <div class="sound-bar w-1.5 bg-white rounded-full h-9"></div>
+          <div class="sound-bar w-1.5 bg-white rounded-full h-5"></div>
+        </div>
+      </button>
+
+      <!-- Status Text & Badge -->
+      <div class="mt-6 flex flex-col items-center gap-2">
+        <span id="activeStatusText" class="text-base font-semibold text-slate-800 tracking-tight">
+          Listening...
+        </span>
+        <span class="px-3.5 py-1 text-xs font-medium text-slate-500 bg-slate-200/60 backdrop-blur-sm rounded-full">
+          Works best on Chrome.
+        </span>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Keyboard Hints Footer Banner -->
+  <footer class="w-full max-w-sm mx-auto mb-8 px-4 z-20">
+    <div class="flex items-center justify-center gap-2 px-4 py-2.5 rounded-full glass-pill border border-slate-200/80 shadow-sm text-xs font-medium text-slate-500">
+      <button id="cmdKTrigger" class="hover:text-slate-900 transition-colors flex items-center gap-1">
+        <kbd class="px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded">⌘K</kbd> to type
+      </button>
+      <span class="text-slate-300">•</span>
+      <span class="flex items-center gap-1">
+        <kbd class="px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded">Space</kbd> hold to talk
+      </span>
+    </div>
+  </footer>
+
+  <!-- Command Palette Text Modal (⌘K) -->
+  <div id="cmdKModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div id="modalContent" class="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 p-5 transform transition-all duration-200 scale-95 opacity-0">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Ask Bunny Buddy</span>
+        <button id="closeModalBtn" class="text-slate-400 hover:text-slate-600 text-xs font-semibold px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition-colors">ESC</button>
+      </div>
+      <form id="textForm" class="mt-4 flex items-center gap-2">
+        <input id="textInput" type="text" placeholder="Type a message or question..." class="flex-1 px-4 py-3 text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white transition-all">
+        <button type="submit" class="px-5 py-3 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-sm">
+          Send
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Client Script Wiring -->
+  <script>
+    // State Variables
+    let isRecording = false;
+    let isSpaceHeld = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let audioCtx = null;
+    let analyser = null;
+    let animFrameId = null;
+    let currentSourceNode = null;
+    
+    // Session ID setup
+    let sessionId = localStorage.getItem('bunny_session_id');
+    if (!sessionId) {
+      sessionId = 'session_' + Math.random().toString(36).substring(2, 11);
+      localStorage.setItem('bunny_session_id', sessionId);
+    }
+
+    // DOM Elements
+    const idleView = document.getElementById('idleView');
+    const activeView = document.getElementById('activeView');
+    const activeStatusText = document.getElementById('activeStatusText');
+    const micBtn = document.getElementById('micBtn');
+    const visualizerCapsule = document.getElementById('visualizerCapsule');
+    const soundBarsContainer = document.getElementById('soundBarsContainer');
+    const soundBars = document.querySelectorAll('.sound-bar');
+    const cmdKModal = document.getElementById('cmdKModal');
+    const modalContent = document.getElementById('modalContent');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const cmdKTrigger = document.getElementById('cmdKTrigger');
+    const textForm = document.getElementById('textForm');
+    const textInput = document.getElementById('textInput');
+    const askAnythingPill = document.getElementById('askAnythingPill');
+
+    // Initialize Web Audio Context
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 64;
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    // View Transitions
+    function showActiveView(status = 'Listening...') {
+      activeStatusText.textContent = status;
+      idleView.classList.add('hidden');
+      activeView.classList.remove('hidden');
+      setTimeout(() => {
+        activeView.classList.remove('opacity-0', 'scale-95');
+        activeView.classList.add('opacity-100', 'scale-100');
+      }, 20);
+    }
+
+    function showIdleView() {
+      stopVisualizer();
+      if (currentSourceNode) {
+        try { currentSourceNode.stop(); } catch(e) {}
+        currentSourceNode = null;
+      }
+      activeView.classList.add('opacity-0', 'scale-95');
+      activeView.classList.remove('opacity-100', 'scale-100');
+      setTimeout(() => {
+        activeView.classList.add('hidden');
+        idleView.classList.remove('hidden');
+      }, 200);
+    }
+
+    // Soundwave Equalizer Visualization Loop
+    function startVisualizer() {
+      stopVisualizer();
+      soundBarsContainer.classList.remove('thinking-pulse');
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      function draw() {
+        analyser.getByteFrequencyData(dataArray);
         
-        // ====================================================================
-        // STATE
-        // ====================================================================
-        const state = {
-            scene: null, camera: null, renderer: null, controls: null,
-            model: null, mixer: null, clock: new THREE.Clock(),
-            bones: {}, meshes: { body: null, mouth: null, eyeL: null, eyeR: null },
-            morphs: { mouth: {}, eyeL: {}, eyeR: {} },
-            current_morphs: {}, target_morphs: {}, morph_fade_progress: {},
-            
-            is_recording: false, is_speaking: false, is_idle_playing: true,
-            debug_mode: false, voice_detected: false,
-            recording_start: 0, audio_context: null, analyser: null,
-            
-            // Audio tracking
-            current_audio: null, audio_start_time: 0, audio_duration: 0,
-            mouth_closed: true
+        // Sample frequencies across bins for the 5 bars
+        const indices = [2, 5, 8, 12, 16];
+        soundBars.forEach((bar, i) => {
+          const val = dataArray[indices[i]] || 0;
+          const scale = Math.max(0.2, val / 140);
+          const heightPx = Math.max(8, Math.min(36, val / 5));
+          bar.style.transform = `scaleY(${scale.toFixed(2)})`;
+          bar.style.height = `${heightPx}px`;
+        });
+        
+        animFrameId = requestAnimationFrame(draw);
+      }
+      draw();
+    }
+
+    function startThinkingAnimation() {
+      stopVisualizer();
+      soundBarsContainer.classList.add('thinking-pulse');
+      soundBars.forEach(bar => {
+        bar.style.transform = '';
+        bar.style.height = '16px';
+      });
+    }
+
+    function stopVisualizer() {
+      if (animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+      soundBarsContainer.classList.remove('thinking-pulse');
+      soundBars.forEach((bar, i) => {
+        bar.style.transform = 'scaleY(1)';
+        const defaultHeights = [16, 32, 24, 36, 20];
+        bar.style.height = `${defaultHeights[i]}px`;
+      });
+    }
+
+    // Audio Recording Logic
+    async function startRecording() {
+      if (isRecording) return;
+      try {
+        initAudioContext();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        
+        // Connect mic to analyser for live visualization during recording
+        const source = audioCtx.createMediaStreamSource(stream);
+        source.connect(analyser);
+
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
         };
-        
-        // ====================================================================
-        // INITIALIZATION
-        // ====================================================================
-        function init() {
-            setupThreeJS();
-            loadModel();
-            setupMicrophone();
-            setupUI();
-            animate();
+
+        mediaRecorder.onstop = async () => {
+          // Stop mic tracks
+          stream.getTracks().forEach(track => track.stop());
+          
+          if (audioChunks.length > 0) {
+            const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/wav' });
+            await sendAudioQuery(audioBlob);
+          }
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        showActiveView('Listening...');
+        startVisualizer();
+      } catch (err) {
+        console.error('Error accessing microphone:', err);
+        alert('Could not access microphone. Please grant permission in your browser.');
+        showIdleView();
+      }
+    }
+
+    function stopRecording() {
+      if (isRecording && mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        isRecording = false;
+        showActiveView('Thinking...');
+        startThinkingAnimation();
+      }
+    }
+
+    // API Interactions
+    async function sendAudioQuery(audioBlob) {
+      showActiveView('Thinking...');
+      startThinkingAnimation();
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'speech.wav');
+        formData.append('sessionId', sessionId);
+
+        const response = await fetch('/converse', {
+          method: 'POST',
+          body: formData
+        });
+
+        const newSessionId = response.headers.get('X-Session-ID');
+        if (newSessionId) {
+          sessionId = newSessionId;
+          localStorage.setItem('bunny_session_id', sessionId);
         }
-        
-        function setupThreeJS() {
-            const container = document.getElementById('canvas-container');
-            console.log('[Setup] Canvas container size:', container.clientWidth, 'x', container.clientHeight);
-            
-            state.scene = new THREE.Scene();
-            state.scene.background = new THREE.Color(0xfef5f0);
-            console.log('[Setup] Scene background:', state.scene.background.getHexString());
-            
-            state.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
-            state.camera.position.set(0, 0.8, 2.5);
-            state.camera.lookAt(0, 0.6, 0);
-            console.log('[Setup] Camera position:', state.camera.position);
-            console.log('[Setup] Camera target:', new THREE.Vector3(0, 0.6, 0));
-            
-            state.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-            state.renderer.setSize(container.clientWidth, container.clientHeight);
-            state.renderer.setPixelRatio(window.devicePixelRatio);
-            state.renderer.shadowMap.enabled = true;
-            container.appendChild(state.renderer.domElement);
-            console.log('[Setup] Renderer initialized, size:', state.renderer.getSize(new THREE.Vector2()));
-            
-            // Lighting - ENHANCED for proper material visibility
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-            state.scene.add(hemiLight);
-            console.log('[Setup] HemisphereLight added: sky=0xffffff, ground=0x444444, intensity=1.2');
-            
-            state.scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            console.log('[Setup] AmbientLight added: color=0xffffff, intensity=0.8');
-            
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-            dirLight.position.set(2, 4, 3);
-            dirLight.castShadow = true;
-            dirLight.shadow.mapSize.width = 2048;
-            dirLight.shadow.mapSize.height = 2048;
-            state.scene.add(dirLight);
-            console.log('[Setup] DirectionalLight added: position=(2,4,3), intensity=1.5');
-            
-            const fillLight = new THREE.DirectionalLight(0x8899ff, 0.4);
-            fillLight.position.set(-3, 4, -3);
-            state.scene.add(fillLight);
-            console.log('[Setup] Fill light added: position=(-3,4,-3), intensity=0.4');
-            
-            state.controls = new OrbitControls(state.camera, state.renderer.domElement);
-            state.controls.target.set(0, 0.6, 0);
-            state.controls.autoRotate = true;
-            state.controls.autoRotateSpeed = 2;
-            state.controls.enableDamping = true;
-            state.controls.dampingFactor = 0.05;
-            state.controls.update();
-            
-            window.addEventListener('resize', () => {
-                const w = container.clientWidth;
-                const h = container.clientHeight;
-                state.camera.aspect = w / h;
-                state.camera.updateProjectionMatrix();
-                state.renderer.setSize(w, h);
-            });
-            
-            console.log('[Setup] Three.js scene initialized COMPLETE');
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || 'Speech endpoint error');
         }
-        
-        function loadModel() {
-            const loader = new GLTFLoader();
-            console.log('[Model] Starting GLB load from:', 'bunny_character_lipsync.glb');
-            
-            loader.load('character_avatar.glb', (gltf) => {
-                console.log('[Model] GLB loaded successfully');
-                console.log('[Model] Scene children count:', gltf.scene.children.length);
-                
-                state.model = gltf.scene;
-                state.model.rotation.order = 'XYZ';
-                
-                // Diagnostic: check if model needs Y-up to Z-up correction
-                // If the model appears tilted (Z-up in Y-up coordinate system), rotate it
-                // This is a fallback - ideally fixed in Blender export, but applying here for robustness
-                // Temporarily try rotation to see if it improves positioning
-                console.log('[Model] Checking model orientation...');
-                
-                state.scene.add(state.model);
-                console.log('[Model] Model added to Three.js scene');
-                
-                state.model.traverse((child) => {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    
-                    if (child.isMesh && child.material) {
-                        console.log(`[Material] ${child.name}:`, {
-                            type: child.material.constructor.name,
-                            hasMap: child.material.map ? true : false,
-                            colorHex: child.material.color?.getHexString(),
-                            metalness: child.material.metalness,
-                            roughness: child.material.roughness
-                        });
-                        
-                        if (Array.isArray(child.material)) {
-                            child.material.forEach((mat) => {
-                                mat.metalness = 0.1;
-                                mat.roughness = 0.9;
-                                if (!mat.color || mat.color.getHex() === 0x000000) {
-                                    mat.color.setHex(0xdddddd);
-                                }
-                            });
-                        } else {
-                            child.material.metalness = 0.1;
-                            child.material.roughness = 0.9;
-                            if (!child.material.color || child.material.color.getHex() === 0x000000) {
-                                child.material.color.setHex(0xdddddd);
-                            }
-                        }
-                    }
-                    
-                    if (child.isBone) state.bones[child.name] = child;
-                    
-                    if (child.isMesh) {
-                        if (child.name.toLowerCase().includes('mouth')) state.meshes.mouth = child;
-                        else if (child.name.includes('Eye.L')) state.meshes.eyeL = child;
-                        else if (child.name.includes('Eye.R')) state.meshes.eyeR = child;
-                        else if (!state.meshes.body || (child.geometry.attributes?.position?.count || 0) > 
-                                (state.meshes.body.geometry.attributes?.position?.count || 0))
-                            state.meshes.body = child;
-                        
-                        if (child.morphTargetDictionary) {
-                            const dict = child.morphTargetDictionary;
-                            const key = child.name.toLowerCase().includes('mouth') ? 'mouth' :
-                                       child.name.includes('Eye.L') ? 'eyeL' :
-                                       child.name.includes('Eye.R') ? 'eyeR' : null;
-                            if (key && state.morphs[key]) {
-                                Object.entries(dict).forEach(([name, idx]) => {
-                                    state.morphs[key][name] = idx;
-                                    state.current_morphs[name] = 0;
-                                    state.target_morphs[name] = 0;
-                                });
-                            }
-                        }
-                    }
-                });
-                
-                console.log('[Model] Traverse complete. Bones found:', Object.keys(state.bones).length);
-                console.log('[Model] Morphs found:', Object.keys(state.current_morphs).length);
-                
-                if (gltf.animations.length > 0) {
-                    state.mixer = new THREE.AnimationMixer(state.model);
-                    gltf.animations.forEach(clip => state.mixer.clipAction(clip).play());
-                    log('Animations loaded');
-                } else {
-                    createIdleAnimation();
-                }
-                
-                updateModelInfo();
-                updateSpeechBubble('Ready to chat!');
-            }, undefined, (err) => {
-                log(`Load error: ${err.message}`);
-                updateSpeechBubble('Failed to load avatar');
-            });
+
+        const returnedAudioBuffer = await response.arrayBuffer();
+        await playReturnedAudio(returnedAudioBuffer);
+      } catch (err) {
+        console.error('Error sending audio query:', err);
+        showIdleView();
+      }
+    }
+
+    async function sendTextQuery(text) {
+      if (!text || !text.trim()) return;
+      closeModal();
+      showActiveView('Thinking...');
+      startThinkingAnimation();
+
+      try {
+        const response = await fetch('/converse-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_input: text,
+            sessionId: sessionId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Text endpoint error');
         }
-        
-        function createIdleAnimation() {
-            if (!state.bones.chest) return;
-            
-            const chest = state.bones.chest;
-            const origScale = chest.scale.y;
-            
-            setInterval(() => {
-                if (!state.is_speaking && state.is_idle_playing) {
-                    const time = Date.now() * 0.001;
-                    chest.scale.y = origScale * (1 + Math.sin(time * 2) * 0.02);
-                }
-            }, 16);
-            
-            if (state.bones.head) {
-                const head = state.bones.head;
-                const origRot = head.rotation.z;
-                setInterval(() => {
-                    if (!state.is_speaking && state.is_idle_playing) {
-                        const time = Date.now() * 0.001;
-                        head.rotation.z = origRot + Math.sin(time * 1.5) * 0.03;
-                    }
-                }, 16);
-            }
-            
-            if (state.meshes.eyeL && state.meshes.eyeL.morphTargetDictionary?.['blink.L']) {
-                blink();
-            }
-            
-            log('Idle animation created');
+
+        const data = await response.json();
+        if (data.sessionId) {
+          sessionId = data.sessionId;
+          localStorage.setItem('bunny_session_id', sessionId);
         }
-        
-        function blink() {
-            const blink_interval = () => {
-                if (Math.random() < 0.02 && !state.is_speaking) {
-                    const eyeL = state.meshes.eyeL;
-                    const eyeR = state.meshes.eyeR;
-                    if (eyeL && eyeL.morphTargetDictionary?.['blink.L']) {
-                        const idxL = eyeL.morphTargetDictionary['blink.L'];
-                        const startTime = Date.now();
-                        const blink_duration = 100;
-                        
-                        const blink_frame = () => {
-                            const elapsed = Date.now() - startTime;
-                            const progress = Math.min(elapsed / blink_duration, 1);
-                            const value = Math.sin(progress * Math.PI);
-                            
-                            if (eyeL.morphTargetInfluences) eyeL.morphTargetInfluences[idxL] = value;
-                            if (eyeR && eyeR.morphTargetInfluences && eyeR.morphTargetDictionary?.['blink.R']) {
-                                const idxR = eyeR.morphTargetDictionary['blink.R'];
-                                eyeR.morphTargetInfluences[idxR] = value;
-                            }
-                            
-                            if (progress < 1) requestAnimationFrame(blink_frame);
-                        };
-                        blink_frame();
-                    }
-                }
-                setTimeout(blink_interval, 100);
-            };
-            blink_interval();
+
+        if (data.audio_base64) {
+          const binaryString = atob(data.audio_base64);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          await playReturnedAudio(bytes.buffer);
+        } else {
+          showIdleView();
         }
-        
-        // ====================================================================
-        // AUDIO & MIC
-        // ====================================================================
-        function setupMicrophone() {
-            if (!window.AudioContext && !window.webkitAudioContext) {
-                console.error('[Mic] AudioContext not supported');
-                document.getElementById('micStatus').textContent = 'Not supported';
-                return;
-            }
-            
-            state.audio_context = new (window.AudioContext || window.webkitAudioContext)();
-            state.analyser = state.audio_context.createAnalyser();
-            state.analyser.fftSize = 1024;
-            
-            console.log('[Mic] Requesting microphone access...');
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const source = state.audio_context.createMediaStreamSource(stream);
-                    source.connect(state.analyser);
-                    document.getElementById('micStatus').textContent = 'Ready';
-                    document.getElementById('micStatus').className = 'info-item-value success';
-                    console.log('[Mic] SUCCESS: Microphone access granted and connected');
-                })
-                .catch(err => {
-                    console.error('[Mic] ERROR:', err.name, err.message);
-                    console.error('[Mic] Full error object:', err);
-                    
-                    let statusText = 'Error';
-                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                        statusText = 'Blocked';
-                        console.warn('[Mic] Permission was denied. User must reset at chrome://settings/content/microphone');
-                    } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                        statusText = 'No device';
-                    } else if (err.name === 'NotSupportedError') {
-                        statusText = 'Not supported';
-                    } else if (err.name === 'SecurityError') {
-                        statusText = 'HTTP only';
-                        console.warn('[Mic] Page must be served over HTTPS or localhost');
-                    }
-                    
-                    document.getElementById('micStatus').textContent = statusText;
-                    document.getElementById('micStatus').className = 'info-item-value error';
-                    console.log('[Mic] Status set to:', statusText);
-                });
+      } catch (err) {
+        console.error('Error sending text query:', err);
+        showIdleView();
+      }
+    }
+
+    // Play TTS Audio & Drive Soundwave Visualizer
+    async function playReturnedAudio(arrayBuffer) {
+      try {
+        initAudioContext();
+        showActiveView('Speaking...');
+
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        if (currentSourceNode) {
+          try { currentSourceNode.stop(); } catch(e) {}
         }
-        
-        function startRecording() {
-            if (!state.audio_context) { alert('Audio not ready'); return; }
-            
-            state.is_recording = true;
-            state.recording_start = Date.now();
-            updateSpeechBubble('Listening...');
-            
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const mediaRecorder = new MediaRecorder(stream);
-                    const chunks = [];
-                    
-                    mediaRecorder.ondataavailable = e => chunks.push(e.data);
-                    mediaRecorder.onstop = () => {
-                        state.is_recording = false;
-                        updateSpeechBubble('Thinking...');
-                        const blob = new Blob(chunks, { type: 'audio/wav' });
-                        sendAudioToBackend(blob);
-                    };
-                    
-                    mediaRecorder.start();
-                    document.getElementById('micBtn').textContent = '⏹️ Stop Recording';
-                    document.getElementById('micBtn').classList.add('recording');
-                    
-                    const recordTimeout = setTimeout(() => {
-                        if (state.is_recording) {
-                            mediaRecorder.stop();
-                            state.is_recording = false;
-                        }
-                    }, 10000);
-                    
-                    document.getElementById('micBtn').onclick = () => {
-                        if (state.is_recording) {
-                            clearTimeout(recordTimeout);
-                            mediaRecorder.stop();
-                            state.is_recording = false;
-                            document.getElementById('micBtn').textContent = '🎤 Start Recording';
-                            document.getElementById('micBtn').classList.remove('recording');
-                            document.getElementById('micBtn').onclick = startRecording;
-                        }
-                    };
-                });
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(analyser);
+        analyser.connect(audioCtx.destination);
+
+        currentSourceNode = source;
+        startVisualizer();
+
+        source.onended = () => {
+          showIdleView();
+        };
+
+        source.start(0);
+      } catch (err) {
+        console.error('Audio playback failed:', err);
+        showIdleView();
+      }
+    }
+
+    // Command Palette Modal Logic
+    function openModal() {
+      cmdKModal.classList.remove('hidden');
+      setTimeout(() => {
+        modalContent.classList.remove('scale-95', 'opacity-0');
+        modalContent.classList.add('scale-100', 'opacity-100');
+        textInput.focus();
+      }, 10);
+    }
+
+    function closeModal() {
+      modalContent.classList.remove('scale-100', 'opacity-100');
+      modalContent.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => {
+        cmdKModal.classList.add('hidden');
+        textInput.value = '';
+      }, 150);
+    }
+
+    // Event Listeners Setup
+    micBtn.addEventListener('click', () => {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    });
+
+    visualizerCapsule.addEventListener('click', () => {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        showIdleView();
+      }
+    });
+
+    // Prompt pills click handlers
+    document.querySelectorAll('.prompt-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn === askAnythingPill) {
+          openModal();
+        } else {
+          const prompt = btn.getAttribute('data-prompt');
+          sendTextQuery(prompt);
         }
-        
-        function sendAudioToBackend(blob) {
-            const formData = new FormData();
-            formData.append('audio', blob);
-            
-            fetch('/converse', {
-                method: 'POST',
-                body: formData
-            })
-            .then(res => {
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                return res.arrayBuffer();
-            })
-            .then(arrayBuffer => {
-                playAudioWithLipSync(arrayBuffer);
-            })
-            .catch(err => {
-                log(`Backend error: ${err.message}`);
-                updateSpeechBubble('Sorry, something went wrong!');
-                document.getElementById('micBtn').textContent = '🎤 Start Recording';
-                document.getElementById('micBtn').classList.remove('recording');
-                document.getElementById('micBtn').onclick = startRecording;
-            });
+      });
+    });
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', (e) => {
+      // ⌘K or Ctrl+K
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        if (cmdKModal.classList.contains('hidden')) {
+          openModal();
+        } else {
+          closeModal();
         }
-        
-        function playAudioWithLipSync(arrayBuffer) {
-            const audioContext = state.audio_context;
-            
-            audioContext.decodeAudioData(arrayBuffer, (buffer) => {
-                const source = audioContext.createBufferSource();
-                const analyser = audioContext.createAnalyser();
-                
-                source.buffer = buffer;
-                source.connect(analyser);
-                analyser.connect(audioContext.destination);
-                
-                state.audio_duration = buffer.duration;
-                state.audio_start_time = audioContext.currentTime;
-                state.is_speaking = true;
-                state.is_idle_playing = false;
-                state.mouth_closed = false;
-                updateSpeechBubble('Speaking...');
-                
-                const dataArray = new Uint8Array(analyser.frequencyBinCount);
-                
-                function updateLipSync() {
-                    if (!state.is_speaking) return;
-                    
-                    analyser.getByteFrequencyData(dataArray);
-                    
-                    let sum = 0, voicedFreq = 0;
-                    for (let i = 0; i < dataArray.length; i++) {
-                        sum += dataArray[i];
-                        if (i > 4 && i < 50) voicedFreq += dataArray[i];
-                    }
-                    
-                    const avg = sum / dataArray.length;
-                    const jawValue = Math.max(0, (avg - 30) / 256 * 0.8);
-                    
-                    setMorphTarget('jawOpen', jawValue);
-                    document.getElementById('jawValue').textContent = jawValue.toFixed(2);
-                    
-                    if (voicedFreq > 200) {
-                        const visemeIndex = Math.floor((voicedFreq / 4000) * 5);
-                        const visemes = ['A', 'E', 'I', 'O', 'U'];
-                        const viseme = visemes[Math.min(visemeIndex, 4)];
-                        
-                        visemes.forEach(v => setMorphTarget(`viseme_${v}`, 0));
-                        setMorphTarget(`viseme_${viseme}`, Math.min(jawValue + 0.2, 1));
-                        document.getElementById('visemeValue').textContent = viseme;
-                    } else {
-                        document.getElementById('visemeValue').textContent = '—';
-                    }
-                    
-                    document.getElementById('voiceActivity').textContent = avg > 50 ? 'Voiced' : 'Silent';
-                    document.getElementById('voiceActivity').className = 'info-item-value ' + (avg > 50 ? 'success' : 'neutral');
-                    
-                    requestAnimationFrame(updateLipSync);
-                }
-                
-                source.start(0);
-                updateLipSync();
-                
-                source.onended = () => {
-                    state.is_speaking = false;
-                    state.is_idle_playing = true;
-                    state.mouth_closed = true;
-                    closeMouth();
-                    updateSpeechBubble('Ready to chat!');
-                    document.getElementById('micBtn').textContent = '🎤 Start Recording';
-                    document.getElementById('micBtn').classList.remove('recording');
-                    document.getElementById('micBtn').onclick = startRecording;
-                    document.getElementById('visemeValue').textContent = '—';
-                };
-            });
+        return;
+      }
+
+      // Escape key to close modal
+      if (e.key === 'Escape' && !cmdKModal.classList.contains('hidden')) {
+        closeModal();
+        return;
+      }
+
+      // Spacebar hold-to-talk (only when modal is hidden and not focused on input)
+      if (e.code === 'Space' && !e.repeat) {
+        const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+        if (activeTag !== 'input' && activeTag !== 'textarea' && cmdKModal.classList.contains('hidden')) {
+          e.preventDefault();
+          isSpaceHeld = true;
+          startRecording();
         }
-        
-        function closeMouth() {
-            setMorphTarget('jawOpen', 0);
-            setMorphTarget('viseme_A', 0);
-            setMorphTarget('viseme_E', 0);
-            setMorphTarget('viseme_I', 0);
-            setMorphTarget('viseme_O', 0);
-            setMorphTarget('viseme_U', 0);
-        }
-        
-        function setMorphTarget(name, value) {
-            state.target_morphs[name] = Math.max(0, Math.min(1, value));
-        }
-        
-        function updateMorphTargets(delta) {
-            const fadeSpeed = delta / 0.1;
-            Object.entries(state.target_morphs).forEach(([name, target]) => {
-                const current = state.current_morphs[name] || 0;
-                const updated = current + (target - current) * Math.min(1, fadeSpeed * 10);
-                state.current_morphs[name] = updated;
-                
-                if (state.meshes.mouth && name in state.morphs.mouth) {
-                    const idx = state.morphs.mouth[name];
-                    if (state.meshes.mouth.morphTargetInfluences) 
-                        state.meshes.mouth.morphTargetInfluences[idx] = updated;
-                }
-                if (state.meshes.eyeL && name in state.morphs.eyeL) {
-                    const idx = state.morphs.eyeL[name];
-                    if (state.meshes.eyeL.morphTargetInfluences) 
-                        state.meshes.eyeL.morphTargetInfluences[idx] = updated;
-                }
-                if (state.meshes.eyeR && name in state.morphs.eyeR) {
-                    const idx = state.morphs.eyeR[name];
-                    if (state.meshes.eyeR.morphTargetInfluences) 
-                        state.meshes.eyeR.morphTargetInfluences[idx] = updated;
-                }
-            });
-        }
-        
-        // ====================================================================
-        // UI & HELPERS
-        // ====================================================================
-        function setupUI() {
-            document.getElementById('micBtn').onclick = startRecording;
-            
-            document.getElementById('debugBtn').onclick = function() {
-                state.debug_mode = !state.debug_mode;
-                document.getElementById('debugPanel').classList.toggle('active');
-                this.textContent = state.debug_mode ? '🔧 Debug [ON]' : '🔧 Debug';
-            };
-            
-            document.getElementById('idleBtn').onclick = function() {
-                state.is_idle_playing = !state.is_idle_playing;
-                this.textContent = state.is_idle_playing ? '😴 Idle [ON]' : '😴 Idle [OFF]';
-            };
-            
-            setInterval(() => {
-                if (state.is_recording) {
-                    const elapsed = Math.floor((Date.now() - state.recording_start) / 1000);
-                    document.getElementById('recordTime').textContent = `${Math.floor(elapsed/60)}:${String(elapsed%60).padStart(2,'0')}`;
-                }
-            }, 100);
-        }
-        
-        function updateSpeechBubble(text) {
-            document.getElementById('speechBubble').textContent = text;
-        }
-        
-        function updateModelInfo() {
-            const info = [];
-            info.push(`✓ GLB loaded`);
-            info.push(`Bones: ${Object.keys(state.bones).length}`);
-            info.push(`Morphs: ${Object.keys(state.current_morphs).length}`);
-            document.getElementById('modelStatus').innerHTML = info.join(' • ');
-        }
-        
-        function log(msg) {
-            console.log('[Avatar]', msg);
-            if (state.debug_mode) {
-                const el = document.getElementById('debugOutput');
-                const time = new Date().toLocaleTimeString();
-                el.innerHTML = `[${time}] ${msg}<br>` + el.innerHTML;
-                if (el.children.length > 10) el.removeChild(el.lastChild);
-            }
-        }
-        
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = state.clock.getDelta();
-            
-            if (state.mixer) state.mixer.update(delta);
-            updateMorphTargets(delta);
-            state.controls.update();
-            
-            state.renderer.render(state.scene, state.camera);
-        }
-        
-        // Start
-        window.addEventListener('load', init);
-    </script>
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'Space' && isSpaceHeld) {
+        e.preventDefault();
+        isSpaceHeld = false;
+        stopRecording();
+      }
+    });
+
+    // Modal submit & background click
+    textForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendTextQuery(textInput.value);
+    });
+
+    closeModalBtn.addEventListener('click', closeModal);
+    cmdKTrigger.addEventListener('click', openModal);
+
+    cmdKModal.addEventListener('click', (e) => {
+      if (e.target === cmdKModal) {
+        closeModal();
+      }
+    });
+  </script>
 </body>
 </html>
