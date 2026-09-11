@@ -1,0 +1,103 @@
+services:
+  # Main Voice Assistant Backend
+  - type: web
+    name: voice-assistant-api
+    runtime: docker
+    region: oregon  # Change to preferred region (oregon, virginia, frankfurt, singapore, sydney)
+    
+    # Docker configuration
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    
+    # Health check (already defined in Dockerfile, but can override)
+    healthCheckPath: /health
+    healthCheckInterval: 30
+    
+    # Port configuration
+    port: 3000
+    
+    # Deployment settings
+    autoDeploy: true
+    
+    # Build settings
+    buildCommand: npm ci --only=production
+    startCommand: node server.js
+    
+    # Environment variables
+    envVars:
+      # Core configuration
+      - key: NODE_ENV
+        value: production
+      
+      - key: LLM_PROVIDER
+        value: gemini
+      
+      - key: PORT
+        value: 3000
+      
+      # Deepgram (Speech-to-Text)
+      - key: DEEPGRAM_API_KEY
+        sync: false  # Set manually in Render dashboard
+      
+      # Google Gemini (LLM)
+      - key: GEMINI_API_KEY
+        sync: false  # Set manually in Render dashboard
+      
+      # Chroma Cloud (Memory/Vector DB)
+      - key: CHROMA_URL
+        value: https://api.trychroma.com  # Update to your Chroma Cloud URL
+      
+      - key: CHROMA_API_KEY
+        sync: false  # Set manually in Render dashboard
+      
+      # Embedding model for Chroma
+      - key: EMBEDDING_MODEL
+        value: mxbai-embed-large
+      
+      # Tool API keys (optional)
+      - key: OPENWEATHER_API_KEY
+        sync: false  # Set manually if needed
+      
+      - key: SERPER_API_KEY
+        sync: false  # Set manually if needed
+      
+      # TTS configuration
+      - key: TOOLS_ENABLED
+        value: "true"
+
+    # Instance type (adjust based on load)
+    # starter: $7/month (0.5 CPU, 512MB RAM) - good for testing
+    # standard: $12/month (1 CPU, 2GB RAM) - recommended for production
+    plan: standard
+    
+    # Optional: Custom domains
+    # domains:
+    #   - voice-api.example.com
+    
+    # Scaling (optional)
+    # maxInstances: 3
+    # minInstances: 1
+    
+    # Pre-deployment script (optional)
+    # preDeployCommand: npm run build
+
+# Environment variable reference (for manual setup if not using render.yaml)
+# ============================================================================
+# REQUIRED (Production)
+# - DEEPGRAM_API_KEY: Your Deepgram API key for speech-to-text
+# - GEMINI_API_KEY: Your Google Gemini API key for LLM responses
+# - CHROMA_URL: Your Chroma Cloud URL (https://api.trychroma.com)
+# - CHROMA_API_KEY: Your Chroma Cloud API key for memory persistence
+#
+# OPTIONAL (Tool integration)
+# - OPENWEATHER_API_KEY: For weather tool (get_weather)
+# - SERPER_API_KEY: For web search tool (web_search)
+# - GOOGLE_CALENDAR_*: For calendar integration (not used currently)
+#
+# AUTOMATIC (Already set)
+# - NODE_ENV=production
+# - LLM_PROVIDER=gemini
+# - PORT=3000
+# - EMBEDDING_MODEL=mxbai-embed-large
+# - TOOLS_ENABLED=true
+# ============================================================================
