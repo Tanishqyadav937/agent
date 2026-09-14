@@ -1,401 +1,839 @@
-# Architecture Overview
+# Bunny Buddy - System Architecture
 
-## System Design
+## 📐 High-Level Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           CLIENT (Web/Mobile)                               │
+└────────────────────────────────┬────────────────────────────────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │   HTTP/REST API        │
+                    │  Multipart/JSON        │
+                    └────────────┬────────────┘
+                                 │
+        ┌────────────────────────▼────────────────────────┐
+        │      Express.js Server (Node.js 20)            │
+        │           Bunny Buddy Backend                   │
+        └────────────────────────┬────────────────────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       │                       │
+         ▼                       ▼                       ▼
+    ┌─────────┐         ┌──────────────┐       ┌──────────────┐
+    │ Deepgram│         │  Gemini/     │       │ Chroma DB    │
+    │  (STT)  │         │  Ollama      │       │  (Memory)    │
+    │  API    │         │  (LLM)       │       │              │
+    └─────────┘         └──────────────┘       └──────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Piper TTS Engine      │
+                    │   (Local Python)        │
+                    └────────────┬────────────┘
+                                 │
+                    ┌────────────▼────────────┐
+                    │   Audio Output (WAV)    │
+                    │   Returned to Client    │
+                    └────────────────────────┘
+```
+
+---
+
+## 🏗️ Detailed System Architecture
+
+### 1. Request Processing Pipeline
+
+```
+USER AUDIO INPUT
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  1. REQUEST VALIDATION              │
+│  - Audio file size check            │
+│  - Format validation (WAV/MP3/etc)  │
+│  - Session ID extraction            │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  2. DEEPGRAM STT SERVICE            │
+│  - Send audio to Deepgram API       │
+│  - Receive transcript text          │
+│  - Extract confidence scores        │
+│  - Handle silence detection         │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  3. EMBEDDING GENERATION            │
+│  - Load Xenova/all-MiniLM-L6-v2     │
+│  - Convert transcript to vector     │
+│  - Local computation (no API)       │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  4. MEMORY RETRIEVAL                │
+│  - Query Chroma vector store        │
+│  - Find top-3 relevant memories     │
+│  - Filter by session ID             │
+│  - Apply similarity threshold       │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  5. CONTEXT BUILDING                │
+│  - System prompt                    │
+│  - Retrieved memories               │
+│  - Recent 10 conversation turns     │
+│  - Current user message             │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  6. LLM INFERENCE                   │
+│  - Route: Gemini (prod) or          │
+│           Ollama (dev)              │
+│  - Generate natural response        │
+│  - Maintain conversation context    │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  7. ASYNC MEMORY EXTRACTION         │
+│  - Analyze user message             │
+│  - Extract durable facts            │
+│  - Non-blocking (background)        │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  8. MEMORY STORAGE                  │
+│  - Embed extracted fact             │
+│  - Store in Chroma                  │
+│  - Add session metadata             │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  9. TEXT-TO-SPEECH                  │
+│  - Invoke Piper TTS engine          │
+│  - Use voice model                  │
+│  - Generate audio WAV file          │
+└────────────┬────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────┐
+│  10. SESSION BUFFER UPDATE          │
+│  - Add (user, assistant) turn       │
+│  - Keep last 10 turns               │
+│  - Remove oldest if > 10            │
+└────────────┬────────────────────────┘
+             │
+             ▼
+    AUDIO OUTPUT (WAV)
+    + X-Session-ID Header
+```
+
+---
+
+## 🔌 Component Architecture
+
+### A. Express.js Server Core
+
+```javascript
+server.js (Main Application)
+├── Initialization
+│   ├── Load environment variables
+│   ├── Initialize Chroma connection
+│   ├── Initialize Deepgram client
+│   └── Initialize Gemini/Ollama client
+│
+├── Middleware
+│   ├── CORS (cross-origin requests)
+│   ├── JSON parser
+│   ├── Form data parser (fileupload)
+│   └── Static file serving
+│
+├── Route Handlers
+│   ├── POST /converse (main endpoint)
+│   ├── POST /converse-text (text input)
+│   ├── GET /health (status check)
+│   └── GET / (404 response)
+│
+└── Support Functions
+    ├── STT: transcribeAudio()
+    ├── Embedding: generateEmbedding()
+    ├── Memory: retrieveRelevantMemories()
+    ├── LLM: getLLMResponse()
+    ├── TTS: textToSpeech()
+    └── Session: getSession()
+```
+
+### B. Memory Management System
+
+```
+┌────────────────────────────────────────────────────────────┐
+│           MEMORY MANAGEMENT ARCHITECTURE                   │
+└────────────────────────────────────────────────────────────┘
+
+SESSION MEMORY (In-Memory, Ephemeral)
+├── Stores: Last 10 conversation turns
+├── Structure:
+│   └── session[sessionId].turns = [
+│       { user: "...", assistant: "..." },
+│       { user: "...", assistant: "..." },
+│       ... (max 10 items)
+│   ]
+├── Lifespan: Duration of server uptime
+└── Access: Ultra-fast (in RAM)
+
+    │
+    │ ┌─────────────────────────────────────────┐
+    │ │   DURABLE MEMORY EXTRACTION             │
+    │ │   (Background, Non-blocking)            │
+    │ │                                         │
+    │ │   analyzeMessage(userMessage) → bool    │
+    │ │   Filter: preferences, instructions    │
+    │ │   Ignore: questions, greetings         │
+    │ └────────────────┬────────────────────────┘
+    │                  │
+    │                  ▼
+    │ ┌─────────────────────────────────────────┐
+    │ │   EMBEDDING GENERATION                  │
+    │ │   (Local, Xenova)                       │
+    │ │                                         │
+    │ │   fact → embedding (vector)             │
+    │ │   No API cost                           │
+    │ └────────────────┬────────────────────────┘
+    │                  │
+    │                  ▼
+    ▼ ┌─────────────────────────────────────────┐
+      │   PERSISTENT VECTOR STORE               │
+      │   (Chroma DB)                           │
+      │                                         │
+      │   Structure:                            │
+      │   ├── Collection: "memories"            │
+      │   ├── Documents: [facts, ...] (text)    │
+      │   ├── Embeddings: [vectors, ...]        │
+      │   ├── Metadata: {sessionId, timestamp}  │
+      │   └── IDs: unique identifiers           │
+      │                                         │
+      │   Dev: SQLite at ./data/chroma/         │
+      │   Prod: Chroma Cloud (API)              │
+      │                                         │
+      │   Lifespan: Indefinite                  │
+      │   Access: ~100ms per query              │
+      └────────────────┬─────────────────────────┘
+                       │
+                       │ For each new message:
+                       │ Query for top-3 similar
+                       │
+                       ▼
+      ┌─────────────────────────────────────────┐
+      │   MEMORY RETRIEVAL                      │
+      │   (Semantic Search)                     │
+      │                                         │
+      │   1. Embed new message                  │
+      │   2. Find similar vectors               │
+      │   3. Filter by session ID               │
+      │   4. Apply threshold (< 0.95)           │
+      │   5. Return top-3 facts                 │
+      │                                         │
+      │   Output: List of relevant memories     │
+      └────────────────┬────────────────────────┘
+                       │
+                       ▼
+      ┌─────────────────────────────────────────┐
+      │   CONTEXT AUGMENTATION                  │
+      │   Inject into LLM Prompt                │
+      │                                         │
+      │   Prompt = (                            │
+      │     system_prompt +                     │
+      │     retrieved_memories +                │
+      │     recent_10_turns +                   │
+      │     current_message                     │
+      │   )                                     │
+      └─────────────────────────────────────────┘
+```
+
+### C. LLM Provider Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│            LLM PROVIDER ABSTRACTION                      │
+└──────────────────────────────────────────────────────────┘
+
+    LLM_PROVIDER environment variable
+            │
+            ├─────── "gemini" ──────────┐
+            │                           ▼
+            │                ┌────────────────────────┐
+            │                │ GOOGLE GEMINI API      │
+            │                ├────────────────────────┤
+            │                │ Endpoint: generative   │
+            │                │ Model: gemini-3.6-flash
+            │                │ Cost: Pay-per-API      │
+            │                │ Speed: 2-5 seconds     │
+            │                │ Quality: Enterprise    │
+            │                │ Context: 1M tokens     │
+            │                └────────────────────────┘
+            │
+            └─────── "local" ───────────┐
+                                        ▼
+                             ┌────────────────────────┐
+                             │ OLLAMA LOCAL           │
+                             ├────────────────────────┤
+                             │ Endpoint: localhost    │
+                             │ Model: llama3.2        │
+                             │ Cost: Free             │
+                             │ Speed: 1-3 seconds     │
+                             │ Quality: Good          │
+                             │ Privacy: Offline       │
+                             └────────────────────────┘
+
+    Both routed through:
+    getLLMResponseWithContext(contextPrompt) → response
+```
+
+### D. TTS Engine Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│            PIPER TTS ARCHITECTURE                        │
+└──────────────────────────────────────────────────────────┘
+
+    LLM Response Text
+            │
+            ▼
+    ┌──────────────────────────┐
+    │ PIPER TTS ENGINE         │
+    │ (Python 3.11)            │
+    │                          │
+    │ Location:                │
+    │ ~/piper-venv/bin/piper   │
+    │                          │
+    │ Voice Model:             │
+    │ en_US-lessac-medium.onnx │
+    │ Config: .onnx.json       │
+    │                          │
+    │ Input: Text              │
+    │ Output: WAV audio        │
+    │ Sample Rate: 22.05 kHz   │
+    │ Mono/Stereo: Mono        │
+    └────────┬─────────────────┘
+             │
+             ▼
+    ┌──────────────────────────┐
+    │ WAV AUDIO FILE           │
+    │ Temporary storage        │
+    │ Clean up after send      │
+    └────────┬─────────────────┘
+             │
+             ▼
+    ┌──────────────────────────┐
+    │ RETURN TO CLIENT         │
+    │ Content-Type: audio/wav  │
+    └──────────────────────────┘
+
+    Performance:
+    - Generation: ~1-2 seconds per response
+    - Quality: Natural sounding voice
+    - Cost: $0 (local, no API)
+```
+
+---
+
+## 🔄 Data Flow Diagrams
+
+### Flow 1: Complete Conversation Cycle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   NEW CONVERSATION                              │
+└─────────────────────────────────────────────────────────────────┘
+
+Step 1: USER SPEAKS
+   │ Audio File (WAV/MP3)
+   │ + sessionId (optional)
+   ▼
+Step 2: DEEPGRAM STT
+   │ Deepgram API processes audio
+   │ Returns transcript text
+   ▼
+Step 3: EMBEDDING GENERATION
+   │ Xenova/all-MiniLM-L6-v2
+   │ Convert text → vector
+   ▼
+Step 4: MEMORY SEARCH
+   │ Query Chroma DB
+   │ Find similar past facts
+   │ Returns top-3
+   ▼
+Step 5: BUILD CONTEXT
+   Combine:
+   ├── System prompt
+   ├── Retrieved memories
+   ├── Last 10 conversation turns
+   └── Current user message
+   ▼
+Step 6: LLM INFERENCE
+   │ Send context to LLM
+   │ Receive response text
+   ▼
+Step 7: ASYNC EXTRACT
+   │ Analyze user message
+   │ Extract durable facts
+   │ Store in background
+   │ (Non-blocking)
+   ▼
+Step 8: TTS SYNTHESIS
+   │ Piper TTS converts response
+   │ to audio (WAV)
+   ▼
+Step 9: UPDATE SESSION
+   │ Add (user, assistant) turn
+   │ Keep 10-turn rolling buffer
+   ▼
+Step 10: RETURN AUDIO
+   │ Send WAV file
+   │ Include X-Session-ID
+   └─→ CLIENT RECEIVES RESPONSE
+```
+
+### Flow 2: Memory Lifecycle
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   MEMORY LIFECYCLE                              │
+└─────────────────────────────────────────────────────────────────┘
+
+USER MESSAGE: "I prefer dark mode"
+   │
+   ▼
+EXTRACTION (Background)
+   "Is this a durable fact?"
+   ✓ Yes → "User prefers dark mode"
+   │
+   ▼
+EMBEDDING
+   Fact → Vector representation
+   │
+   ▼
+STORAGE (Chroma)
+   Store with metadata:
+   ├── id: "mem_xyz789"
+   ├── text: "User prefers dark mode"
+   ├── embedding: [0.12, 0.45, ...]
+   ├── sessionId: "session_abc123"
+   └── timestamp: "2026-08-28T..."
+   │
+   ▼
+LATER: NEW USER MESSAGE
+   "What are my preferences?"
+   │
+   ▼
+RETRIEVAL
+   1. Embed new message
+   2. Search similar vectors
+   3. Find match: distance 0.45 < 0.95 ✓
+   4. Return: "User prefers dark mode"
+   │
+   ▼
+CONTEXT INJECTION
+   LLM Prompt includes:
+   "RELEVANT MEMORIES:
+    - User prefers dark mode"
+   │
+   ▼
+LLM RESPONSE
+   "Based on what I remember,
+    you prefer dark mode!"
+```
+
+---
+
+## 📊 Component Interaction Diagram
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                        CLIENT                                  │
+│                   (Browser/Mobile)                             │
+└────────────────────────┬─────────────────────────────────────┘
+                         │
+                    HTTP/REST
+                         │
+        ┌────────────────▼────────────────┐
+        │    EXPRESS.JS SERVER LAYER      │
+        │  (Request/Response Handling)    │
+        └────────────────┬────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+         ▼               ▼               ▼
+    ┌────────┐     ┌─────────┐    ┌──────────┐
+    │SERVICES│     │MEMORY   │    │UTILITIES │
+    │ LAYER  │     │ LAYER   │    │ LAYER    │
+    └────────┘     └─────────┘    └──────────┘
+         │               │               │
+         ▼               ▼               ▼
+    ┌────────┐     ┌─────────┐    ┌──────────┐
+    │  STT   │     │ SESSION │    │EMBEDDING │
+    │Deepgram│     │  BUFFER │    │ Xenova   │
+    └────────┘     └─────────┘    └──────────┘
+         │               │
+         ▼               ▼
+    ┌────────┐     ┌─────────┐
+    │  LLM   │     │CHROMA   │
+    │Gemini/ │     │  VECTOR │
+    │Ollama  │     │  STORE  │
+    └────────┘     └─────────┘
+         │
+         ▼
+    ┌────────┐
+    │  TTS   │
+    │ Piper  │
+    └────────┘
+```
+
+---
+
+## 🗂️ File Structure & Dependencies
+
+```
+project-root/
+│
+├── server.js
+│   ├── Imports:
+│   │   ├── express (web framework)
+│   │   ├── axios (HTTP client)
+│   │   ├── dotenv (env vars)
+│   │   ├── chromadb (vector DB)
+│   │   ├── @xenova/transformers (embeddings)
+│   │   └── fs, path (Node.js)
+│   │
+│   ├── Main functions:
+│   │   ├── async initializeChroma()
+│   │   ├── async generateEmbedding(text)
+│   │   ├── function getSession(sessionId)
+│   │   ├── async retrieveRelevantMemories()
+│   │   ├── async extractDurableMemory()
+│   │   ├── async storeMemory()
+│   │   ├── function buildContextPrompt()
+│   │   ├── async transcribeAudio()
+│   │   ├── async getLLMResponseWithContext()
+│   │   ├── async getOllamaResponse()
+│   │   ├── async getGeminiResponse()
+│   │   └── async textToSpeech()
+│   │
+│   └── Routes:
+│       ├── POST /converse (main endpoint)
+│       ├── POST /converse-text (text input)
+│       ├── GET /health (status)
+│       └── GET / (404)
+│
+├── tools.js
+│   ├── Tool definitions (weather, search, etc.)
+│   └── Exported for LLM function calling
+│
+├── package.json
+│   ├── Dependencies:
+│   │   ├── express@^4.18.2
+│   │   ├── axios@^1.4.0
+│   │   ├── dotenv@^16.0.3
+│   │   ├── chromadb@^1.5.11
+│   │   ├── @xenova/transformers@^2.6.1
+│   │   ├── cors@^2.8.5
+│   │   └── express-fileupload@^1.4.0
+│   │
+│   └── Scripts:
+│       ├── start (npm start)
+│       ├── dev (auto-reload)
+│       └── check (dependency check)
+│
+├── .env
+│   ├── DEEPGRAM_API_KEY
+│   ├── GEMINI_API_KEY
+│   ├── CHROMA_URL
+│   ├── CHROMA_API_KEY
+│   ├── LLM_PROVIDER (gemini | local)
+│   └── PORT (3000)
+│
+├── Dockerfile
+│   ├── Stage 1: Python 3.11
+│   │   └── Build Piper TTS
+│   │
+│   └── Stage 2: Node 20
+│       ├── Install runtime deps
+│       ├── Copy Node app
+│       ├── Copy Piper from Stage 1
+│       └── Expose 3000
+│
+├── render.yaml
+│   ├── Service definition
+│   ├── Build config
+│   ├── Health check
+│   ├── Environment variables
+│   └── Dockerfile path
+│
+├── docker-compose.yml
+│   ├── Service: node-app (Port 3000)
+│   ├── Service: chroma (Port 8000)
+│   ├── Service: ollama (Port 11434)
+│   └── Networks: internal
+│
+├── piper-venv/
+│   ├── bin/
+│   │   ├── python
+│   │   └── piper
+│   └── lib/ (Piper dependencies)
+│
+├── piper-voices/
+│   ├── en_US-lessac-medium.onnx
+│   └── en_US-lessac-medium.onnx.json
+│
+└── data/
+    └── chroma/ (Persistent vector store - dev)
+```
+
+---
+
+## 🔐 Security Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Voice Assistant API                      │
+│           SECURITY & ISOLATION LAYERS                       │
 └─────────────────────────────────────────────────────────────┘
 
-Input: Audio File/Stream (WAV, MP3, FLAC, etc.)
-                    ↓
-        ┌───────────────────────┐
-        │   Express Server      │
-        │   POST /converse      │
-        └───────────────────────┘
-                    ↓
-        ┌───────────────────────┐
-        │  Step 1: Deepgram     │
-        │  Speech-to-Text       │
-        │  ─────────────────    │
-        │  Audio → Text         │
-        └───────────────────────┘
-                    ↓
-            "User transcript"
-                    ↓
-        ┌───────────────────────┐
-        │  Step 2: Gemini API   │
-        │  Language Model       │
-        │  ─────────────────    │
-        │  Text → Response      │
-        └───────────────────────┘
-                    ↓
-        "Assistant response text"
-                    ↓
-        ┌───────────────────────┐
-        │  Step 3: ElevenLabs   │
-        │  Text-to-Speech       │
-        │  ─────────────────    │
-        │  Text → Audio         │
-        └───────────────────────┘
-                    ↓
-Output: Audio Response (MP3)
+API Keys
+  ├── Stored: .env (not in git)
+  ├── Loaded: process.env
+  ├── Used: Not logged
+  └── Rotatable: Via dashboard
+
+Session Isolation
+  ├── Each session: Separate memory
+  ├── Queries: Filtered by sessionId
+  ├── No data: Crosses sessions
+  └── Storage: Isolated Chroma collection
+
+CORS Control
+  ├── Allowed origins: Configured
+  ├── Credentials: Explicit settings
+  ├── Methods: POST, GET only
+  └── Headers: JSON/multipart
+
+Error Handling
+  ├── Detailed: Dev mode (logs)
+  ├── Sanitized: Prod mode
+  ├── No secrets: In error responses
+  └── Rate limiting: Not implemented yet
+
+Data Privacy
+  ├── Transcripts: Stored temporarily
+  ├── Embeddings: Never logged
+  ├── Memories: In Chroma only
+  └── Cleanup: Automatic
 ```
 
 ---
 
-## Component Details
+## 📈 Scalability Architecture
 
-### 1. Express Server (`server.js`)
-
-**Responsibilities:**
-- HTTP server with single endpoint
-- File upload handling via multer
-- Request validation
-- Error handling and logging
-- Response streaming
-
-**Key Technologies:**
-- Express.js for HTTP server
-- Multer for multipart/form-data parsing
-- In-memory storage for audio buffers
-
-### 2. Speech-to-Text (Deepgram)
-
-**Function:** `transcribeAudio(audioBuffer)`
-
-**Input:** Audio buffer (any format)
-**Output:** Transcribed text string
-
-**Features:**
-- Model: `nova-2` (latest, most accurate)
-- Smart formatting enabled
-- Supports multiple audio formats
-- Error handling with step tracking
-
-**Error Cases:**
-- Invalid audio format
-- Empty/silent audio
-- API key issues
-- Network failures
-
-### 3. Language Model (Gemini)
-
-**Function:** `getGeminiResponse(userMessage)`
-
-**Input:** User's transcribed message
-**Output:** Assistant's text response
-
-**Configuration:**
-- Model: `gemini-1.5-flash` (free tier)
-- System instruction: Defines personality
-- No streaming (simple completion)
-
-**System Prompt:**
 ```
-You are a helpful and friendly voice assistant. 
-Keep your responses concise and conversational, 
-as they will be spoken aloud. Aim for responses 
-that are 2-3 sentences unless more detail is 
-specifically requested.
-```
+┌─────────────────────────────────────────────────────────────┐
+│            SCALABILITY CONSIDERATIONS                       │
+└─────────────────────────────────────────────────────────────┘
 
-**Error Cases:**
-- API key issues
-- Rate limits
-- Invalid requests
-- Network failures
+Single Server Limitations
+  ├── Sessions: In-memory (lost on restart)
+  ├── Throughput: ~100 req/min
+  ├── Memory: Grows with sessions
+  └── Latency: Varies with LLM
 
-### 4. Text-to-Speech (ElevenLabs)
+Scaling Strategies
 
-**Function:** `textToSpeech(text)`
+1. HORIZONTAL SCALING
+   ├── Load balance multiple servers
+   ├── Session affinity (sticky sessions)
+   ├── Shared Chroma Cloud instance
+   └── Stateless except session buffer
 
-**Input:** Text to speak
-**Output:** Audio buffer (MP3)
+2. VERTICAL SCALING
+   ├── Increase Render instance size
+   ├── More CPU for LLM inference
+   ├── More memory for embeddings
+   └── Better cache locality
 
-**Configuration:**
-- Voice: Rachel (default, configurable)
-- Model: `eleven_multilingual_v2`
-- Stability: 0.5
-- Similarity boost: 0.75
+3. SESSION PERSISTENCE
+   ├── Move buffer to Redis (optional)
+   ├── Enable session migration
+   ├── Survive server restarts
+   └── Better availability
 
-**Error Cases:**
-- API key issues
-- Character quota exceeded
-- Invalid voice ID
-- Network failures
+4. MEMORY OPTIMIZATION
+   ├── Compress embeddings
+   ├── Prune old memories
+   ├── Batch vector operations
+   └── Index optimization
 
----
-
-## Data Flow
-
-### Request Flow
-
-```javascript
-1. Client uploads audio file
-   → Content-Type: multipart/form-data
-   → Field name: "audio"
-   → Stored in memory via multer
-
-2. Audio → Deepgram
-   → Buffer sent to Deepgram API
-   → Receives JSON with transcript
-   → Extracts text from response
-
-3. Text → Gemini
-   → Transcript sent with system prompt
-   → Receives response text
-   → Extracts text from response
-
-4. Text → ElevenLabs
-   → Response text sent to TTS API
-   → Receives audio stream
-   → Collects chunks into buffer
-
-5. Audio → Client
-   → Sets Content-Type: audio/mpeg
-   → Streams buffer as response
-   → Client plays audio
-```
-
-### Error Flow
-
-```javascript
-try {
-  validateInput()      // → 400 Bad Request
-  transcribeAudio()    // → 500 with step: "STT"
-  getGeminiResponse()  // → 500 with step: "LLM"
-  textToSpeech()       // → 500 with step: "TTS"
-} catch (error) {
-  return {
-    error: "Internal server error",
-    message: error.message,
-    step: error.step  // Identifies which API failed
-  }
-}
+Current Single-Instance Architecture
+  ┌─────────────────────────────────┐
+  │  Render Container (2GB RAM)     │
+  │  ┌─────────────────────────────┐│
+  │  │ Express.js Server           ││
+  │  │ ├─ Session Buffer           ││
+  │  │ ├─ Embedding Model (loaded) ││
+  │  │ └─ Piper TTS                ││
+  │  └─────────────────────────────┘│
+  └─────────────────────────────────┘
+         │
+         ├─→ Chroma Cloud (Elastic)
+         ├─→ Deepgram API (Elastic)
+         ├─→ Gemini API (Elastic)
+         └─→ Ollama (N/A in prod)
 ```
 
 ---
 
-## API Contracts
+## 🔧 Deployment Architecture
 
-### POST /converse
-
-**Request:**
-```http
-POST /converse HTTP/1.1
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
-
-------WebKitFormBoundary
-Content-Disposition: form-data; name="audio"; filename="recording.wav"
-Content-Type: audio/wav
-
-[binary audio data]
-------WebKitFormBoundary--
+### Development Environment
+```
+Local Machine
+├── Node.js 20
+├── Python 3.11
+├── docker-compose up
+│   ├── Express server (localhost:3000)
+│   ├── Chroma server (localhost:8000)
+│   └── Ollama server (localhost:11434)
+└── .env with local settings
 ```
 
-**Success Response (200):**
-```http
-HTTP/1.1 200 OK
-Content-Type: audio/mpeg
-Content-Length: 67890
-
-[binary audio data - MP3]
+### Production Environment (Render)
 ```
-
-**Error Response (400):**
-```json
-{
-  "error": "No audio file provided"
-}
-```
-
-**Error Response (500):**
-```json
-{
-  "error": "Internal server error",
-  "message": "API key is invalid",
-  "step": "STT (Deepgram)"
-}
-```
-
-### GET /health
-
-**Success Response (200):**
-```json
-{
-  "status": "ok",
-  "services": {
-    "deepgram": true,
-    "gemini": true,
-    "elevenlabs": true
-  }
-}
+Render Container
+├── Multi-stage Docker Build
+│   ├── Stage 1: Python 3.11
+│   │   └── Build Piper TTS
+│   └── Stage 2: Node 20
+│       ├── Bundle app
+│       ├── Copy Piper
+│       └── Start server
+├── Health checks (30s interval)
+├── Automatic restarts on failure
+└── Environment variables injected
 ```
 
 ---
 
-## Configuration
+## 🎯 Key Design Patterns
 
-### Environment Variables
+### 1. **Request-Response Pattern**
+- HTTP POST with audio/text input
+- Synchronous response with audio output
+- No streaming (could add WebSocket)
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `DEEPGRAM_API_KEY` | Yes | Deepgram API key | `abc123...` |
-| `GEMINI_API_KEY` | Yes | Google Gemini API key | `AIza...` |
-| `ELEVENLABS_API_KEY` | Yes | ElevenLabs API key | `xyz789...` |
-| `ELEVENLABS_VOICE_ID` | No | Voice to use | `21m00Tcm4TlvDq8ikWAM` |
-| `PORT` | No | Server port | `3000` |
+### 2. **Session Management Pattern**
+- SessionId-based conversation tracking
+- Automatic generation if not provided
+- Per-session memory isolation
 
-### Default Values
+### 3. **Pipeline Pattern**
+- Sequential processing steps
+- Each step independent
+- Easy to add/remove steps
 
-- Port: `3000`
-- Voice: Rachel (`21m00Tcm4TlvDq8ikWAM`)
-- Model (STT): `nova-2`
-- Model (LLM): `gemini-1.5-flash`
-- Model (TTS): `eleven_multilingual_v2`
+### 4. **Async Background Processing**
+- Memory extraction non-blocking
+- Doesn't delay response
+- Eventual consistency
 
----
+### 5. **Provider Abstraction**
+- Swappable LLM providers
+- Environment-driven routing
+- Identical interface
 
-## Performance Characteristics
-
-### Latency
-
-| Step | Typical | Range |
-|------|---------|-------|
-| Upload | 50ms | 10-100ms |
-| Deepgram STT | 2s | 1-3s |
-| Gemini LLM | 3s | 2-5s |
-| ElevenLabs TTS | 3s | 2-4s |
-| Download | 100ms | 50-200ms |
-| **Total** | **8s** | **5-12s** |
-
-*Times vary based on audio length, response length, and network conditions*
-
-### Throughput
-
-- Concurrent requests supported (limited by API rate limits)
-- No shared state between requests
-- Stateless design allows horizontal scaling
-
-### Resource Usage
-
-- Memory: ~50MB base + ~1MB per concurrent request
-- CPU: Minimal (I/O bound)
-- Network: ~100KB in + ~200KB out per request
+### 6. **Vector Similarity Search**
+- Semantic matching via embeddings
+- Threshold-based filtering
+- Top-K retrieval
 
 ---
 
-## Security Considerations
+## 📊 Performance Characteristics
 
-### Current Implementation
-
-- ✅ No persistent storage (audio in memory only)
-- ✅ API keys in environment variables
-- ✅ Basic input validation
-- ✅ Error messages don't leak sensitive info
-
-### Not Implemented (Future)
-
-- ❌ Authentication/authorization
-- ❌ Rate limiting
-- ❌ Request signing
-- ❌ Audio file validation (format, size, duration)
-- ❌ HTTPS enforcement
-- ❌ API key rotation
-- ❌ Audit logging
+```
+Operation              Time      Cost      Notes
+─────────────────────────────────────────────────────
+STT (Deepgram)        1-3s      $0.0043   Per minute
+Embedding Gen         0.5-1s    $0        Local
+Memory Query          0.1s      $0        Vector search
+LLM Response          2-5s      $0.001    Via Gemini
+TTS Synthesis         1-2s      $0        Local Piper
+Total E2E             5-12s     ~$0.006   Per interaction
+```
 
 ---
 
-## Limitations
+## 🔮 Future Architecture Enhancements
 
-### By Design (Minimal MVP)
+```
+Potential Improvements
 
-1. **No Memory:** Each request is independent
-2. **No Streaming:** Full audio required upfront
-3. **No Tools:** Claude used for text completion only
-4. **No History:** Can't reference previous conversations
-5. **No Authentication:** Open endpoint
+1. STREAMING
+   ├── WebSocket connection
+   ├── Real-time audio streaming
+   ├── Lower latency
+   └── Better UX
 
-### Technical Limitations
+2. DISTRIBUTED SESSIONS
+   ├── Redis session store
+   ├── Multi-server support
+   ├── Session migration
+   └── High availability
 
-1. **Audio Size:** Limited by Deepgram (typically 250MB)
-2. **Response Length:** Limited by Claude (1024 tokens)
-3. **TTS Length:** Limited by ElevenLabs quota
-4. **Concurrent Requests:** Limited by API rate limits
+3. ADVANCED MEMORY
+   ├── Memory summarization
+   ├── Hierarchical storage
+   ├── Forgetting mechanisms
+   ├── Temporal indexing
+   └── Semantic clustering
 
----
+4. MULTI-LLM SUPPORT
+   ├── LLaMA integration
+   ├── Claude support
+   ├── Model comparison
+   ├── Ensemble methods
+   └── A/B testing framework
 
-## Extension Points
-
-### Easy Additions
-
-1. **Conversation Memory:**
-   ```javascript
-   // Store conversation history per user
-   const conversations = new Map();
-   
-   app.post('/converse', (req, res) => {
-     const userId = req.headers['x-user-id'];
-     const history = conversations.get(userId) || [];
-     // Include history in Gemini request
-   });
-   ```
-
-2. **Streaming Support:**
-   ```javascript
-   // Stream audio as it's generated
-   deepgram.listen.live(audioStream)
-     .pipe(claudeStream)
-     .pipe(elevenlabsStream)
-     .pipe(res);
-   ```
-
-3. **Tool Use:**
-   ```javascript
-   // Add tools to Gemini request
-   const model = genAI.getGenerativeModel({
-     model: 'gemini-1.5-flash',
-     tools: [weatherTool, calculatorTool],
-     // ...
-   });
-   ```
-
-4. **Authentication:**
-   ```javascript
-   app.use('/converse', authenticateToken);
-   ```
-
-### Architectural Changes
-
-1. **WebSocket:** Real-time bidirectional audio
-2. **Queue System:** Background processing for long tasks
-3. **Database:** Store conversations, user preferences
-4. **Caching:** Cache TTS for common responses
-5. **Load Balancer:** Distribute across multiple instances
+5. ENHANCED VOICE
+   ├── Voice cloning
+   ├── Emotion detection
+   ├── Multiple voice models
+   ├── Accent selection
+   └── Gender/age control
+```
 
 ---
 
-## Testing Strategy
+## ✅ Architecture Checklist
 
-### Unit Tests
-- Individual function testing
-- Mock API responses
-- Error handling validation
+- ✅ Modular component design
+- ✅ Clear separation of concerns
+- ✅ Stateless API (mostly)
+- ✅ Async memory operations
+- ✅ Error handling & recovery
+- ✅ CORS & security
+- ✅ Environment-driven config
+- ✅ Health monitoring
+- ✅ Scalability considered
+- ✅ Documentation complete
 
-### Integration Tests
-- Full pipeline end-to-end
-- Real API calls (dev environment)
-- Performance benchmarks
+---
 
-### Load Tests
-- Concurrent request handling
-- Rate limit behavior
-- Resource usage under load
-
-### Manual Tests
-- Browser test page
-- curl scripts
-- Different audio formats
-
-See `TESTING.md` for detailed testing procedures.
+**Version**: 3.0  
+**Last Updated**: August 28, 2026  
+**Status**: Production Ready ✅

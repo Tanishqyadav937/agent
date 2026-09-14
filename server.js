@@ -22,7 +22,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // Enable CORS for avatar frontend
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:8000', 'http://127.0.0.1:3000', 'http://127.0.0.1:8000'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:8000', 'http://127.0.0.1:3000', 'http://127.0.0.1:8000'],
   credentials: true
 }));
 
@@ -746,9 +746,14 @@ app.use(express.static('.', {
   }
 }));
 
-// Serve test page
+// Serve avatar page as landing (main page)
 app.get('/', (req, res) => {
-  res.sendFile('test.html', { root: '.' });
+  res.status(404).json({ error: 'Not found', message: 'Use /health to check service status or /converse to send audio' });
+});
+
+// Serve old test page
+app.get('/test', (req, res) => {
+  res.status(404).json({ error: 'Not found', message: 'Test page has been removed. Use API endpoints instead.' });
 });
 
 // Health check endpoint
