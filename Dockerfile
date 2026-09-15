@@ -61,7 +61,6 @@ RUN mkdir -p /app/piper-venv/bin && \
 
 # Copy application code
 COPY server.js tools.js .env.example /app/
-COPY avatar.html index.html test.html /app/
 COPY scripts/ /app/scripts/
 
 # Expose port (Render will set actual port via PORT env var)
