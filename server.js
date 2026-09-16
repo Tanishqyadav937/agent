@@ -3,7 +3,7 @@ import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@deepgram/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ChromaClient } from 'chromadb';
+import { CloudClient } from 'chromadb';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -46,27 +46,25 @@ const normalizedProvider = LLM_PROVIDER === 'cloud' ? 'gemini' : LLM_PROVIDER;
 
 console.log(`[LLM] Provider: ${normalizedProvider}${normalizedProvider === 'local' ? ` (${OLLAMA_MODEL})` : ' (Google Gemini)'}`);
 console.log(`[LLM] Tools enabled: ${TOOLS_ENABLED}`);
-// Initialize Chroma client (local server on port 8000 OR Chroma Cloud)
-const CHROMA_URL = process.env.CHROMA_URL || 'http://localhost:8000';
-const CHROMA_API_KEY = process.env.CHROMA_API_KEY || null;
+// Initialize Chroma Cloud client
+const CHROMA_API_KEY = process.env.CHROMA_API_KEY;
+const CHROMA_TENANT = process.env.CHROMA_TENANT;
+const CHROMA_DATABASE = process.env.CHROMA_DATABASE;
 
-console.log(`[Chroma] URL: ${CHROMA_URL}${CHROMA_API_KEY ? ' (with API key)' : ''}`);
+console.log(`[Chroma] Initializing Cloud Client${CHROMA_API_KEY ? ' (with API key)' : ' (no API key - will fail)'}`);
 
 let chromaClient;
-if (CHROMA_API_KEY) {
-  // Production: Chroma Cloud with API key
-  chromaClient = new ChromaClient({
-    path: CHROMA_URL,
-    auth: {
-      provider: 'token',
-      credentials: CHROMA_API_KEY
-    }
+if (CHROMA_API_KEY && CHROMA_TENANT && CHROMA_DATABASE) {
+  // Chroma Cloud with explicit credentials
+  chromaClient = new CloudClient({
+    apiKey: CHROMA_API_KEY,
+    tenant: CHROMA_TENANT,
+    database: CHROMA_DATABASE
   });
 } else {
-  // Development: Local Chroma server
-  chromaClient = new ChromaClient({
-    path: CHROMA_URL
-  });
+  console.warn('[Chroma] Warning: Missing required Chroma Cloud credentials');
+  console.warn('[Chroma] Required: CHROMA_API_KEY, CHROMA_TENANT, CHROMA_DATABASE');
+  chromaClient = null;
 }
 
 // Embedding Configuration
