@@ -520,7 +520,7 @@ async function transcribeAudio(audioBuffer) {
 // Get response from LLM with context (Gemini in production, Ollama optional in dev)
 async function getLLMResponseWithContext(contextPrompt) {
   try {
-    // Production: Always use Gemini if provider is explicitly set to 'gemini'
+    // Production: Always use Groq if provider is explicitly set to 'gemini'
     if (normalizedProvider === 'gemini') {
       return await getGeminiResponse(contextPrompt);
     }
@@ -872,7 +872,7 @@ initializeChroma().then(() => {
     // Check for missing API keys
     const missing = [];
     if (!process.env.DEEPGRAM_API_KEY) missing.push('DEEPGRAM_API_KEY');
-    if (!process.env.GEMINI_API_KEY) missing.push('GEMINI_API_KEY');
+    if (!process.env.GROQ_API_KEY) missing.push('GROQ_API_KEY');
     
     if (missing.length > 0) {
       console.warn(`⚠️  Warning: Missing API keys: ${missing.join(', ')}`);
