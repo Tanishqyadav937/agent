@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@deepgram/sdk';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { CloudClient } from 'chromadb';
 import { v4 as uuidv4 } from 'uuid';
 import dotenv from 'dotenv';
@@ -32,11 +31,10 @@ app.use(express.json());
 
 // Initialize API clients
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // LLM Provider Configuration
 // In production (Render), LLM_PROVIDER should be 'gemini' to skip Ollama entirely
-// Possible values: 'local' (Ollama), 'gemini' (Google Gemini - production), 'cloud' (legacy, maps to gemini)
+// Possible values: 'local' (Ollama), 'gemini' (Groq API - production), 'cloud' (legacy, maps to gemini)
 const LLM_PROVIDER = process.env.LLM_PROVIDER || 'local'; // 'local', 'gemini', or 'cloud'
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2';
@@ -45,7 +43,7 @@ const TOOLS_ENABLED = process.env.TOOLS_ENABLED === 'true'; // Enable function c
 // Normalize provider names
 const normalizedProvider = LLM_PROVIDER === 'cloud' ? 'gemini' : LLM_PROVIDER;
 
-console.log(`[LLM] Provider: ${normalizedProvider}${normalizedProvider === 'local' ? ` (${OLLAMA_MODEL})` : ' (Google Gemini)'}`);
+console.log(`[LLM] Provider: ${normalizedProvider}${normalizedProvider === 'local' ? ` (${OLLAMA_MODEL})` : ' (Groq)'}`);
 console.log(`[LLM] Tools enabled: ${TOOLS_ENABLED}`);
 // Initialize Chroma Cloud client
 const CHROMA_API_KEY = process.env.CHROMA_API_KEY;
@@ -244,9 +242,25 @@ Response:`;
       const data = await response.json();
       extraction = data.message.content.trim();
     } else {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
-      const result = await model.generateContent(extractionPrompt);
-      extraction = result.response.text().trim();
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: "mixtral-8x7b-32768",
+          messages: [{ role: "user", content: extractionPrompt }],
+          max_tokens: 200
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Groq API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      extraction = data.choices[0].message.content.trim();
     }
     
     if (extraction === 'NONE' || extraction.toLowerCase().includes('none')) {
@@ -650,20 +664,32 @@ async function getOllamaResponse(contextPrompt) {
 // Get response from Gemini (cloud)
 async function getGeminiResponse(contextPrompt) {
   try {
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3.6-flash',
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "mixtral-8x7b-32768",
+        messages: [{ role: "user", content: contextPrompt }],
+        max_tokens: 500
+      })
     });
 
-    const result = await model.generateContent(contextPrompt);
-    const response = result.response.text();
-    
-    if (!response) {
-      throw new Error('No response from Gemini');
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.statusText}`);
     }
 
-    return response;
+    const data = await response.json();
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      throw new Error('Invalid response from Groq');
+    }
+
+    return data.choices[0].message.content;
   } catch (error) {
-    console.error('[LLM] Gemini error:', error.message);
+    console.error('[LLM] Groq error:', error.message);
     throw error;
   }
 }
