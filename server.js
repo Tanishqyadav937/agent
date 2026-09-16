@@ -787,7 +787,7 @@ app.get('/health', async (req, res) => {
     status: 'ok',
     services: {
       deepgram: !!process.env.DEEPGRAM_API_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
+      groq: !!process.env.GROQ_API_KEY,
       piper: fs.existsSync(path.join(__dirname, 'piper-venv', 'bin', 'python')),
       chroma: memoryCollection !== null,
       ollama: {
@@ -840,7 +840,7 @@ app.get('/health', async (req, res) => {
   
   // Check LLM based on provider
   if (normalizedProvider === 'gemini') {
-    criticalServicesOk = criticalServicesOk && health.services.gemini;
+    criticalServicesOk = criticalServicesOk && health.services.groq;
   } else if (normalizedProvider === 'local') {
     criticalServicesOk = criticalServicesOk && health.services.ollama.reachable && health.services.ollama.model_available;
   }
