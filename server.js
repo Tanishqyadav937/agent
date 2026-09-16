@@ -45,6 +45,13 @@ const normalizedProvider = LLM_PROVIDER === 'cloud' ? 'gemini' : LLM_PROVIDER;
 
 console.log(`[LLM] Provider: ${normalizedProvider}${normalizedProvider === 'local' ? ` (${OLLAMA_MODEL})` : ' (Groq)'}`);
 console.log(`[LLM] Tools enabled: ${TOOLS_ENABLED}`);
+
+// Groq Model Configuration
+const GROQ_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+const GROQ_FAST_MODEL = process.env.GROQ_FAST_MODEL || 'openai/gpt-oss-20b';
+
+console.log(`[Groq] Models: ${GROQ_MODEL} (standard), ${GROQ_FAST_MODEL} (fast)`);
+
 // Initialize Chroma Cloud client
 const CHROMA_API_KEY = process.env.CHROMA_API_KEY;
 const CHROMA_TENANT = process.env.CHROMA_TENANT;
@@ -249,14 +256,16 @@ Response:`;
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          model: "mixtral-8x7b-32768",
+          model: GROQ_FAST_MODEL,
           messages: [{ role: "user", content: extractionPrompt }],
           max_tokens: 200
         })
       });
 
       if (!response.ok) {
-        throw new Error(`Groq API error: ${response.statusText}`);
+        const body = await response.text();
+        console.error(`[Groq] ${response.status} ${response.statusText}: ${body}`);
+        throw new Error(`Groq ${response.status}: ${body}`);
       }
 
       const data = await response.json();
@@ -671,14 +680,16 @@ async function getGeminiResponse(contextPrompt) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "mixtral-8x7b-32768",
+        model: GROQ_MODEL,
         messages: [{ role: "user", content: contextPrompt }],
         max_tokens: 500
       })
     });
 
     if (!response.ok) {
-      throw new Error(`Groq API error: ${response.statusText}`);
+      const body = await response.text();
+      console.error(`[Groq] ${response.status} ${response.statusText}: ${body}`);
+      throw new Error(`Groq ${response.status}: ${body}`);
     }
 
     const data = await response.json();
