@@ -258,7 +258,9 @@ Response:`;
         body: JSON.stringify({
           model: GROQ_FAST_MODEL,
           messages: [{ role: "user", content: extractionPrompt }],
-          max_tokens: 200
+          max_completion_tokens: 1024,
+          reasoning_effort: "low",
+          response_format: { type: "json_object" }
         })
       });
 
@@ -682,7 +684,8 @@ async function getGeminiResponse(contextPrompt) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         messages: [{ role: "user", content: contextPrompt }],
-        max_tokens: 500
+        max_completion_tokens: 1024,
+        reasoning_effort: "medium"
       })
     });
 
