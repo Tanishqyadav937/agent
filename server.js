@@ -528,13 +528,13 @@ async function getLLMResponseWithContext(contextPrompt) {
     else if (normalizedProvider === 'local') {
       return await getOllamaResponse(contextPrompt);
     }
-    // Fallback: Use Gemini if neither is configured
+    // Fallback: Use Groq if neither is configured
     else {
-      console.warn('[LLM] Unknown provider, falling back to Gemini');
+      console.warn('[LLM] Unknown provider, falling back to Groq');
       return await getGeminiResponse(contextPrompt);
     }
   } catch (error) {
-    const provider = normalizedProvider === 'local' ? 'Ollama' : 'Gemini';
+    const provider = normalizedProvider === 'local' ? 'Ollama' : 'Groq';
     error.step = `LLM (${provider})`;
     throw error;
   }
