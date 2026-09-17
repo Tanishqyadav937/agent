@@ -18,7 +18,7 @@ export const TOOLS = [
     type: 'function',
     function: {
       name: 'get_weather',
-      description: 'Get the current weather for a location. Use this when the user asks about weather conditions.',
+      description: 'Get the current weather for a location including temperature, conditions, sunrise/sunset times, and whether it is daytime. Use this when the user asks about weather, daytime/nighttime, or time of day in their location.',
       parameters: {
         type: 'object',
         properties: {
@@ -142,7 +142,11 @@ export async function get_weather({ location, unit = 'fahrenheit' }) {
           unit: 'fahrenheit',
           condition: 'Sunny',
           humidity: 45,
-          wind_speed: 8
+          wind_speed: 8,
+          local_time: '14:30',
+          is_daytime: true,
+          sunrise: '06:30',
+          sunset: '18:45'
         }
       };
     }
@@ -159,6 +163,13 @@ export async function get_weather({ location, unit = 'fahrenheit' }) {
 
     const data = await response.json();
     
+    // data.timezone is the location's UTC offset in seconds
+    const localNowMs = Date.now() + (data.timezone * 1000);
+    const localNow = new Date(localNowMs);
+    const sunriseMs = (data.sys.sunrise + data.timezone) * 1000;
+    const sunsetMs = (data.sys.sunset + data.timezone) * 1000;
+    const isDaytime = localNowMs >= sunriseMs && localNowMs < sunsetMs;
+
     return {
       success: true,
       data: {
@@ -168,7 +179,11 @@ export async function get_weather({ location, unit = 'fahrenheit' }) {
         condition: data.weather[0].main,
         description: data.weather[0].description,
         humidity: data.main.humidity,
-        wind_speed: Math.round(data.wind.speed)
+        wind_speed: Math.round(data.wind.speed),
+        local_time: localNow.toISOString().substring(11, 16), // "HH:MM" in the location's local time
+        is_daytime: isDaytime,
+        sunrise: new Date(sunriseMs).toISOString().substring(11, 16),
+        sunset: new Date(sunsetMs).toISOString().substring(11, 16)
       }
     };
   } catch (error) {
@@ -183,7 +198,11 @@ export async function get_weather({ location, unit = 'fahrenheit' }) {
         unit: 'fahrenheit',
         condition: 'Sunny',
         humidity: 45,
-        wind_speed: 8
+        wind_speed: 8,
+        local_time: '14:30',
+        is_daytime: true,
+        sunrise: '06:30',
+        sunset: '18:45'
       }
     };
   }
