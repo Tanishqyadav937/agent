@@ -107,6 +107,18 @@ export const TOOLS = [
         required: ['task', 'time']
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_location',
+      description: "Get the user's approximate current location (city, region, country). Use this when the user asks about weather, places, or anything 'near me' without naming a location.",
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: []
+      }
+    }
   }
 ];
 
@@ -173,6 +185,44 @@ export async function get_weather({ location, unit = 'fahrenheit' }) {
         humidity: 45,
         wind_speed: 8
       }
+    };
+  }
+}
+
+/**
+ * Get user's current location from IP address
+ */
+export async function get_location(args, context = {}) {
+  try {
+    const ip = context.clientIp;
+    const isLocal = !ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.');
+    const target = isLocal ? '' : ip;
+
+    const response = await fetch(`http://ip-api.com/json/${target}?fields=status,message,city,region,country,lat,lon,timezone`);
+    const data = await response.json();
+
+    if (data.status !== 'success') {
+      throw new Error(`Location lookup failed: ${data.message || 'unknown error'}`);
+    }
+
+    return {
+      success: true,
+      data: {
+        city: data.city,
+        region: data.region,
+        country: data.country,
+        lat: data.lat,
+        lon: data.lon,
+        timezone: data.timezone
+      }
+    };
+  } catch (error) {
+    console.error('[Tool] get_location error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      mock: true,
+      data: { city: 'Unknown', region: '', country: '', lat: null, lon: null }
     };
   }
 }
@@ -336,7 +386,7 @@ export async function create_reminder({ task, time }) {
 /**
  * Execute a tool call
  */
-export async function executeTool(toolName, args) {
+export async function executeTool(toolName, args, context = {}) {
   console.log(`[Tool] Executing: ${toolName}`, JSON.stringify(args, null, 2));
   
   switch (toolName) {
@@ -348,6 +398,8 @@ export async function executeTool(toolName, args) {
       return await create_calendar_event(args);
     case 'create_reminder':
       return await create_reminder(args);
+    case 'get_location':
+      return await get_location(args, context);
     default:
       return {
         success: false,

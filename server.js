@@ -29,6 +29,9 @@ app.use(cors({
 // Parse JSON request bodies
 app.use(express.json());
 
+// Trust proxy for Render (gets real client IP from x-forwarded-for header)
+app.set('trust proxy', true);
+
 // Initialize API clients
 const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
@@ -347,6 +350,9 @@ function buildContextPrompt(sessionId, userMessage, relevantMemories) {
 // Main endpoint: accepts audio, returns audio
 app.post('/converse', upload.single('audio'), async (req, res) => {
   try {
+    // Extract client IP from request (Render puts real IP in x-forwarded-for)
+    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0].trim()) || req.ip;
+
     // Validate input
     if (!req.file) {
       return res.status(400).json({ error: 'No audio file provided' });
@@ -379,7 +385,7 @@ app.post('/converse', upload.single('audio'), async (req, res) => {
     const contextPrompt = buildContextPrompt(sessionId, transcript, relevantMemories);
 
     // Step 4: Get response from LLM with context
-    const assistantResponse = await getLLMResponseWithContext(contextPrompt);
+    const assistantResponse = await getLLMResponseWithContext(contextPrompt, clientIp);
     console.log(`[4/7] Assistant response: "${assistantResponse}"`);
 
     // Step 5: Extract and store durable memory (async, don't block response)
@@ -425,6 +431,9 @@ app.post('/converse', upload.single('audio'), async (req, res) => {
 // Accepts JSON text input, returns JSON with text response + base64 audio
 app.post('/converse-text', async (req, res) => {
   try {
+    // Extract client IP from request
+    const clientIp = (req.headers['x-forwarded-for']?.split(',')[0].trim()) || req.ip;
+
     const { user_input, sessionId: clientSessionId } = req.body;
     
     if (!user_input || user_input.trim().length === 0) {
@@ -443,7 +452,7 @@ app.post('/converse-text', async (req, res) => {
     const contextPrompt = buildContextPrompt(sessionId, user_input, relevantMemories);
 
     // Step 3: Get response from LLM with context
-    const assistantResponse = await getLLMResponseWithContext(contextPrompt);
+    const assistantResponse = await getLLMResponseWithContext(contextPrompt, clientIp);
     console.log(`[Avatar] Response: "${assistantResponse}"`);
 
     // Step 4: Extract and store durable memory (async, don't block response)
@@ -529,20 +538,20 @@ async function transcribeAudio(audioBuffer) {
 }
 
 // Get response from LLM with context (Gemini in production, Ollama optional in dev)
-async function getLLMResponseWithContext(contextPrompt) {
+async function getLLMResponseWithContext(contextPrompt, clientIp) {
   try {
     // Production: Always use Groq if provider is explicitly set to 'gemini'
     if (normalizedProvider === 'gemini') {
-      return await getGeminiResponse(contextPrompt);
+      return await getGeminiResponse(contextPrompt, clientIp);
     }
     // Development: Use Ollama
     else if (normalizedProvider === 'local') {
-      return await getOllamaResponse(contextPrompt);
+      return await getOllamaResponse(contextPrompt, clientIp);
     }
     // Fallback: Use Groq if neither is configured
     else {
       console.warn('[LLM] Unknown provider, falling back to Groq');
-      return await getGeminiResponse(contextPrompt);
+      return await getGeminiResponse(contextPrompt, clientIp);
     }
   } catch (error) {
     const provider = normalizedProvider === 'local' ? 'Ollama' : 'Groq';
@@ -635,7 +644,7 @@ async function getOllamaResponse(contextPrompt) {
           console.log(`[Tools] Calling: ${toolName}`);
           
           // Execute the tool
-          const toolResult = await executeTool(toolName, toolArgs);
+          const toolResult = await executeTool(toolName, toolArgs, { clientIp });
           
           // Add tool result to messages
           messages.push({
@@ -672,36 +681,110 @@ async function getOllamaResponse(contextPrompt) {
   }
 }
 
-// Get response from Gemini (cloud)
-async function getGeminiResponse(contextPrompt) {
+// Get response from Groq with optional tool calling
+async function getGeminiResponse(contextPrompt, clientIp) {
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: "user", content: contextPrompt }],
-        max_completion_tokens: 1024,
-        reasoning_effort: "medium"
-      })
-    });
+    // No-tools path — unchanged behavior when TOOLS_ENABLED=false
+    if (!TOOLS_ENABLED) {
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [{ role: "user", content: contextPrompt }],
+          max_completion_tokens: 1024,
+          reasoning_effort: "medium"
+        })
+      });
 
-    if (!response.ok) {
-      const body = await response.text();
-      console.error(`[Groq] ${response.status} ${response.statusText}: ${body}`);
-      throw new Error(`Groq ${response.status}: ${body}`);
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`[Groq] ${response.status} ${response.statusText}: ${body}`);
+        throw new Error(`Groq ${response.status}: ${body}`);
+      }
+
+      const data = await response.json();
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Invalid response from Groq');
+      }
+      return data.choices[0].message.content;
     }
 
-    const data = await response.json();
-    
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      throw new Error('Invalid response from Groq');
+    // Tool-calling path
+    let messages = [{ role: "user", content: contextPrompt }];
+    let maxIterations = 5;
+    let iteration = 0;
+
+    while (iteration < maxIterations) {
+      iteration++;
+
+      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: messages,
+          tools: TOOLS,
+          max_completion_tokens: 1024,
+          reasoning_effort: "medium"
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`[Groq] ${response.status} ${response.statusText}: ${body}`);
+        throw new Error(`Groq ${response.status}: ${body}`);
+      }
+
+      const data = await response.json();
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        throw new Error('Invalid response from Groq');
+      }
+
+      const message = data.choices[0].message;
+      messages.push(message);
+
+      if (message.tool_calls && message.tool_calls.length > 0) {
+        console.log(`[Tools] Model requested ${message.tool_calls.length} tool call(s)`);
+
+        for (const toolCall of message.tool_calls) {
+          const toolName = toolCall.function.name;
+          // Groq/OpenAI format returns arguments as a JSON STRING, unlike Ollama
+          let toolArgs;
+          try {
+            toolArgs = JSON.parse(toolCall.function.arguments);
+          } catch (parseErr) {
+            console.error(`[Tools] Failed to parse arguments for ${toolName}:`, toolCall.function.arguments);
+            toolArgs = {};
+          }
+
+          console.log(`[Tools] Calling: ${toolName}`);
+          const toolResult = await executeTool(toolName, toolArgs, { clientIp });
+
+          // OpenAI/Groq tool messages MUST include tool_call_id
+          messages.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: JSON.stringify(toolResult)
+          });
+
+          console.log(`[Tools] Result: ${toolResult.success ? 'success' : 'failed'}`);
+        }
+        // loop again so the model can respond using the tool results
+        continue;
+      }
+
+      // No tool calls — this is the final answer
+      return message.content;
     }
 
-    return data.choices[0].message.content;
+    throw new Error('Max tool-calling iterations reached without a final response');
   } catch (error) {
     console.error('[LLM] Groq error:', error.message);
     throw error;
